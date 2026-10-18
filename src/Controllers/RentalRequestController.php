@@ -66,6 +66,13 @@ class RentalRequestController extends Controller
             return;
         }
         $timeline = $this->bookings()->timeline((int) $rental['id']);
+        $payments = $this->payments();
+        $paymentsEnabled = $payments->enabled();
+        $split = $payments->split((int) $rental['total_pence']);
+        $money = $rental['booking_id'] !== null ? $payments->summary((int) $rental['booking_id']) : ['payment' => null, 'refunds' => [], 'payout' => null];
+        $paymentReturn = in_array($_GET['payment'] ?? '', ['success', 'cancelled'], true) ? $_GET['payment'] : null;
+        $feePercent = rtrim(rtrim(number_format($this->config['payments']['platform_fee_bps'] / 100, 2), '0'), '.');
+        $feePayer = $this->config['payments']['fee_payer'];
         $actions = $rental['booking_id'] !== null ? BookingStatus::actionsFor($rental['booking_status'], $rental['role']) : [];
         $success = $_SESSION['rental_success'] ?? null;
         $error = $_SESSION['rental_error'] ?? null;
@@ -120,6 +127,11 @@ class RentalRequestController extends Controller
         try {
             $this->bookings()->transition((int) $user['id'], $id, $to);
             $_SESSION['rental_success'] = 'Booking updated: ' . BookingStatus::label($to) . '.';
+            if ($to === BookingStatus::COMPLETED && $this->payments()->enabled()) {
+                // Rental finished: pay the owner their share (or hold it until their payout account is ready).
+                $rental = $this->bookings()->findForUser($id, (int) $user['id']);
+                $this->payments()->releasePayout((int) $rental['booking_id']);
+            }
         } catch (BookingException $e) {
             $_SESSION['rental_error'] = $e->getMessage();
         }

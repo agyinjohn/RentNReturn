@@ -30,6 +30,16 @@ class Router
         return $this;
     }
 
+    /**
+     * A POST from another server (payment-provider webhook). No CSRF token or session: the handler MUST
+     * authenticate the request itself (e.g. by verifying the provider's signature).
+     */
+    public function webhook(string $path, string $handler): self
+    {
+        $this->routes[] = ['POST', $path, $handler, false, false, true];
+        return $this;
+    }
+
     public function dispatch(): void
     {
         $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -38,12 +48,13 @@ class Router
 
         foreach ($this->routes as $route) {
             [$routeMethod, $pattern, $handler, $auth, $verified] = $route;
+            $isWebhook = $route[5] ?? false;
             if ($routeMethod !== $method) {
                 continue;
             }
             $params = $this->match($pattern, $uri);
             if ($params !== null) {
-                if ($method === 'POST' && !Security::validateCsrf()) {
+                if ($method === 'POST' && !$isWebhook && !Security::validateCsrf()) {
                     http_response_code(419);
                     echo 'Your session security token expired or was invalid. Please go back, refresh the page and try again.';
                     return;

@@ -738,3 +738,10 @@ body::after {
 .verify-no { color: var(--color-text-muted); }
 .verify-summary { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 12px 0 28px; }
 .meta { color: var(--color-text-muted); font-size: 0.9rem; }
+
+/* Payments */
+.money-box { border: 1px solid var(--color-border); border-radius: 8px; padding: 12px 16px; margin: 16px 0; background: var(--color-surface); }
+.money-box p { margin: 4px 0; }
+.payout-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+.payout-table th, .payout-table td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--color-border); vertical-align: top; }
+@media (max-width: 600px) { .payout-table .hide-sm { display: none; } }

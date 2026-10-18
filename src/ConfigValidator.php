@@ -17,11 +17,27 @@ final class ConfigValidator
         if (!in_array($env, ['development', 'staging', 'production'], true)) {
             return ["APP_ENV must be development, staging or production (got '{$env}')."];
         }
-        if ($env === 'development') {
-            return [];
-        }
-
         $problems = [];
+        $stripeKey = (string) ($config['stripe']['secret_key'] ?? '');
+        if (preg_match('/^(sk|rk)_live_/', $stripeKey) && empty($config['payments']['live_approved'])) {
+            $problems[] = 'Live Stripe keys are not allowed until the staging demonstration is signed off (PAYMENTS_LIVE_APPROVED=yes). Use test-mode keys.';
+        }
+        if ($stripeKey !== '' && !preg_match('/^(sk|rk)_(test|live)_/', $stripeKey)) {
+            $problems[] = 'STRIPE_SECRET_KEY must be a Stripe secret or restricted key (sk_test_... / rk_test_...).';
+        }
+        $payments = $config['payments'] ?? ['fee_payer' => 'owner', 'platform_fee_bps' => 1000];
+        if (!in_array($payments['fee_payer'] ?? 'owner', ['owner', 'renter'], true)) {
+            $problems[] = 'PLATFORM_FEE_PAYER must be owner or renter.';
+        }
+        if (($payments['platform_fee_bps'] ?? 1000) < 0 || ($payments['platform_fee_bps'] ?? 1000) > 5000) {
+            $problems[] = 'PLATFORM_FEE_BPS must be between 0 and 5000 (0–50%).';
+        }
+        if ($env === 'development') {
+            return $problems;
+        }
+        if ($stripeKey !== '' && ($config['stripe']['webhook_secret'] ?? '') === '') {
+            $problems[] = 'STRIPE_WEBHOOK_SECRET is required when Stripe is configured (payments are confirmed only by signed webhooks).';
+        }
         if (!empty($config['debug'])) {
             $problems[] = 'APP_DEBUG must be 0 outside development.';
         }

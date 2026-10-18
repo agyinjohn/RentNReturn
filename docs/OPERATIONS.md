@@ -44,6 +44,29 @@ and `TWILIO_FROM` (a UK number, or a Messaging Service SID starting `MG`). In th
 **Geo permissions** to the United Kingdom as a second line of defence against SMS pumping fraud (the app already
 accepts only UK mobiles). Failures are logged as `"message":"SMS delivery failed"`.
 
+### Stripe (payments)
+
+**Test mode only until Darren signs off** — the app refuses live keys (`sk_live_…`) unless `PAYMENTS_LIVE_APPROVED=yes`.
+
+1. Stripe dashboard (test mode) → Developers → API keys: set `STRIPE_SECRET_KEY` (`sk_test_…`) and
+   `STRIPE_PUBLISHABLE_KEY` (`pk_test_…`).
+2. Connect → get started → choose **Express** accounts, platform country United Kingdom, and fill in the platform
+   profile (branding shown to owners during onboarding).
+3. Developers → Webhooks → *Add endpoint* `https://<domain>/webhooks/stripe` with events
+   `checkout.session.completed`, `checkout.session.expired`, `checkout.session.async_payment_succeeded`,
+   `checkout.session.async_payment_failed`, `refund.created`, `refund.updated`, `refund.failed`, and
+   `account.updated` (tick **Listen to events on Connected accounts** for that one). Copy the signing secret into
+   `STRIPE_WEBHOOK_SECRET`.
+4. Local development: `stripe listen --forward-to localhost:8080/webhooks/stripe` (Stripe CLI) prints a
+   `whsec_…` secret for `STRIPE_WEBHOOK_SECRET`.
+
+Payments are confirmed **only** by the webhook — if it is misconfigured, renters pay but bookings stay "awaiting
+payment". Check `php bin/payments.php webhooks` and Stripe → Webhooks → recent deliveries. Stripe retries failed
+deliveries for 3 days; processing is idempotent, so retries and replays are safe.
+
+Money for a booking: `php bin/payments.php status <bookingId>`. Refund: `php bin/payments.php refund <bookingId> <£> "<reason>"`.
+Owner payouts are sent when the booking is completed; failed or waiting ones are retried hourly by `bin/cleanup.php`.
+
 ### Identity verification
 
 `IDENTITY_PROVIDER=none` until a provider is integrated (users see "coming soon"). `simulated` is for development

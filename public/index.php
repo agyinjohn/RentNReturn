@@ -7,7 +7,10 @@ $config = require dirname(__DIR__) . '/bootstrap.php';
 App\Security::enforceHttps($config);
 App\Security::sendHeaders($config);
 
-App\Auth::init($config);
+// Webhooks come from Stripe's servers: no session.
+if (!str_starts_with((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/webhooks/')) {
+    App\Auth::init($config);
+}
 
 $router = new App\Router($config);
 
@@ -65,7 +68,19 @@ $router->get('/dashboard', 'App\Controllers\DashboardController::index', true);
 $router->post('/requests/{id}/accept', 'App\Controllers\RentalRequestController::accept', true, true);
 $router->post('/requests/{id}/decline', 'App\Controllers\RentalRequestController::decline', true);
 $router->get('/rentals/{id}', 'App\Controllers\RentalRequestController::show', true);
+$router->post('/rentals/{id}/pay', 'App\Controllers\PaymentController::pay', true, true);
+$router->post('/rentals/{id}/owner-cancel', 'App\Controllers\PaymentController::ownerCancel', true, true);
 $router->post('/rentals/{id}/cancel-request', 'App\Controllers\RentalRequestController::cancelRequest', true);
 $router->post('/rentals/{id}/status', 'App\Controllers\RentalRequestController::transition', true);
+
+// Owner payouts (Stripe Connect)
+$router->get('/payouts', 'App\Controllers\PaymentController::payouts', true);
+$router->post('/payouts/onboard', 'App\Controllers\PaymentController::onboard', true, true);
+$router->get('/payouts/return', 'App\Controllers\PaymentController::onboardReturn', true);
+$router->get('/payouts/refresh', 'App\Controllers\PaymentController::onboardRefresh', true);
+$router->post('/payouts/dashboard', 'App\Controllers\PaymentController::stripeDashboard', true);
+
+// Stripe → RentNReturn. Authenticated by signature inside the handler; the only way a booking becomes paid.
+$router->webhook('/webhooks/stripe', 'App\Controllers\WebhookController::stripe');
 
 $router->dispatch();

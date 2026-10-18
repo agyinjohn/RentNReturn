@@ -7,7 +7,8 @@ declare(strict_types=1);
  *   php bin/cleanup.php
  * Removes expired rate-limit counters and old tokens, abandoned listing draft photos (older than 24h)
  * and leftover temporary AI upload files (older than 1h). Releases approved bookings whose payment
- * deadline passed and expires requests the owner never answered before their start date.
+ * deadline passed, expires requests the owner never answered before their start date, and (with Stripe
+ * configured) retries owner payouts that failed or were waiting for the owner's payout account.
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -36,6 +37,11 @@ $counts = [
 $expired = (new App\Booking\BookingService($pdo, $config['bookings']))->expireOverdue();
 $counts['expired_bookings'] = $expired['bookings'];
 $counts['expired_requests'] = $expired['requests'];
+if ($config['stripe']['secret_key'] !== '') {
+    // Pay owners for completed rentals whose transfer failed or was waiting for their payout account.
+    $released = (new App\Payments\PaymentService($pdo, new App\Payments\StripeGateway($config['stripe']), new App\Booking\BookingService($pdo, $config['bookings']), $config))->releaseDuePayouts();
+    $counts['payouts_transferred'] = count(array_filter($released, static fn (string $r): bool => $r === 'transferred'));
+}
 
 App\Logger::info('Cleanup completed', $counts);
 foreach ($counts as $what => $n) {

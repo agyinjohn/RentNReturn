@@ -47,6 +47,7 @@ Set real environment variables on servers rather than shipping a `.env` file. Al
 | `php bin/restore.php <dir> --yes` | Restore a backup (overwrites the configured database) |
 | `php bin/cleanup.php` | Hourly housekeeping: expire unpaid approvals and stale requests, tokens/limits, drafts, temp files |
 | `php bin/package.php` | Build a clean, secret-free source zip in `build/` |
+| `php bin/payments.php status\|refund\|release-due\|webhooks …` | Inspect a booking's money, refund, release owner payouts, list failed webhooks |
 | `php bin/verification.php status\|withdraw\|record …` | View a user's verification history; withdraw or record identity outcomes |
 | `composer test` | Run the test suite (needs a MySQL/MariaDB server; see below) |
 
@@ -70,6 +71,9 @@ CI runs it on every push (`.github/workflows/tests.yml`) against MySQL 8.0 and M
   development until one is chosen), and the public **RentNReturn Verified ✓** badge (email + mobile + identity),
   derived only from server-side results. Public pages use display names and never show legal names or contact
   details; public member pages at `/people/{id}`. See [docs/STEP_3_REPORT.md](docs/STEP_3_REPORT.md).
+- **Payments (Stripe, test mode):** renters pay through Stripe Checkout; bookings are confirmed only by signed
+  Stripe webhooks; owners get paid through Stripe Connect Express when the rental is completed; refunds, payouts and
+  an append-only money ledger. See [docs/STEP_4_REPORT.md](docs/STEP_4_REPORT.md).
 - **Listings:** 1–5 photos, AI-suggested title/description (Groq, Gemini or OpenAI; reviewed and edited by the owner
   before saving), category, condition, daily price in £, availability window. Publish/unpublish. With no AI key,
   or if the AI call fails, the owner writes the title and description themselves.
@@ -97,6 +101,7 @@ docs/            Operations runbook and stage reports
 public/          Web root (index.php, assets, uploads/)
 src/             PHP classes (App\ namespace)
   Booking/       Rental periods, money (pence), booking lifecycle and BookingService
+  Payments/      Fees, Stripe gateway, payments/refunds/payouts, Connect onboarding, webhook processor
   Sms/           SMS sender (Twilio, or log file in development)
   Verification/  Phone codes, identity providers, the trust badge rule
   Controllers/   Auth, PasswordReset, EmailVerification, Listings, Requests, Dashboard, Api

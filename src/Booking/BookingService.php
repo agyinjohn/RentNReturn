@@ -153,6 +153,25 @@ final class BookingService
     }
 
     /**
+     * Owner cancels a booking that has already been paid (before handover). The caller (PaymentService) refunds
+     * the renter in full. Returns the booking row as it was before cancelling.
+     */
+    public function cancelPaidByOwner(int $ownerId, int $requestId): array
+    {
+        return $this->locked($this->listingIdForRequest($requestId), function () use ($ownerId, $requestId): array {
+            $booking = $this->lockBookingByRequest($requestId);
+            if (!$booking || (int) $booking['owner_id'] !== $ownerId) {
+                throw new BookingException('Booking not found.');
+            }
+            if (!in_array($booking['status'], [BookingStatus::CONFIRMED, BookingStatus::HANDOVER_READY], true)) {
+                throw new BookingException('Only a paid booking that has not been handed over yet can be cancelled this way.');
+            }
+            $this->setBookingStatus($booking, BookingStatus::CANCELLED, $ownerId, 'owner', 'Cancelled by owner after payment — full refund to renter');
+            return $booking;
+        });
+    }
+
+    /**
      * Mark a booking paid. Only to be called from a verified payment-provider event (Step 4: Stripe webhook),
      * never from a browser request. Safe to call repeatedly for the same booking.
      *

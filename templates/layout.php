@@ -25,6 +25,7 @@ $pageTitle = $pageTitle ?? 'RentNReturn';
           <a href="/listings/create">List an item</a>
           <a href="/listings/my">My listings</a>
           <a href="/dashboard">Dashboard</a>
+          <a href="/payouts">Payouts</a>
           <a href="/requests">My requests</a>
           <a href="/profile">Profile</a>
           <form method="post" action="/logout" style="display:inline;">

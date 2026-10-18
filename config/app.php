@@ -96,6 +96,25 @@ return [
         'provider' => getenv('IDENTITY_PROVIDER') ?: 'none',
     ],
 
+    'stripe' => [
+        // TEST MODE keys (sk_test_..., pk_test_...) until Darren signs off; live keys are refused otherwise.
+        'secret_key' => getenv('STRIPE_SECRET_KEY') ?: '',
+        'publishable_key' => getenv('STRIPE_PUBLISHABLE_KEY') ?: '',
+        // Signing secret of the webhook endpoint (whsec_...), from the Stripe dashboard or `stripe listen`.
+        'webhook_secret' => getenv('STRIPE_WEBHOOK_SECRET') ?: '',
+        'api_base' => getenv('STRIPE_API_BASE') ?: 'https://api.stripe.com',
+        'connect_country' => 'GB',
+    ],
+
+    'payments' => [
+        // RentNReturn commission in basis points (1000 = 10%).
+        'platform_fee_bps' => (int) (getenv('PLATFORM_FEE_BPS') ?: 1000),
+        // Who pays it: 'owner' (deducted from the owner's payout) or 'renter' (added to the renter's total).
+        'fee_payer' => getenv('PLATFORM_FEE_PAYER') ?: 'owner',
+        // Set to "yes" only after Darren signs off the staging demonstration (Step 9). Required for live keys.
+        'live_approved' => getenv('PAYMENTS_LIVE_APPROVED') === 'yes',
+    ],
+
     'verification' => [
         'otp_ttl' => 600,
         'otp_max_attempts' => 5,

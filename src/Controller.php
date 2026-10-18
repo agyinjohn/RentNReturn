@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App;
 
 use App\Booking\BookingService;
+use App\Payments\ConnectService;
+use App\Payments\PaymentService;
+use App\Payments\StripeGateway;
 use App\Mail\Mailer;
 
 abstract class Controller
@@ -48,6 +51,23 @@ abstract class Controller
     protected function bookings(): BookingService
     {
         return new BookingService(Database::get($this->config), $this->config['bookings']);
+    }
+
+    protected function payments(): PaymentService
+    {
+        return new PaymentService(Database::get($this->config), $this->stripeGateway(), $this->bookings(), $this->config);
+    }
+
+    protected function connect(): ?ConnectService
+    {
+        $stripe = $this->stripeGateway();
+        return $stripe ? new ConnectService(Database::get($this->config), $stripe, $this->config) : null;
+    }
+
+    /** Null when Stripe is not configured (payments shown as "coming soon"). */
+    protected function stripeGateway(): ?StripeGateway
+    {
+        return $this->config['stripe']['secret_key'] !== '' ? new StripeGateway($this->config['stripe']) : null;
     }
 
     protected function tokens(): UserTokens

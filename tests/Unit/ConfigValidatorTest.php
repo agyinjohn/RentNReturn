@@ -21,6 +21,8 @@ final class ConfigValidatorTest extends TestCase
             'database' => ['password' => 'secret'],
             'sms' => ['driver' => 'twilio', 'twilio_sid' => 'AC123', 'twilio_token' => 'tok', 'twilio_from' => '+447700900000'],
             'identity' => ['provider' => 'none'],
+            'stripe' => ['secret_key' => 'sk_test_123', 'webhook_secret' => 'whsec_123'],
+            'payments' => ['fee_payer' => 'owner', 'platform_fee_bps' => 1000, 'live_approved' => false],
         ], $overrides);
     }
 
@@ -60,7 +62,18 @@ final class ConfigValidatorTest extends TestCase
             'log sms driver' => [['sms' => ['driver' => 'log']], 'SMS_DRIVER'],
             'twilio without credentials' => [['sms' => ['twilio_token' => '']], 'TWILIO_'],
             'simulated identity provider' => [['identity' => ['provider' => 'simulated']], 'IDENTITY_PROVIDER=simulated'],
+            'live stripe key without sign-off' => [['stripe' => ['secret_key' => 'sk_live_abc']], 'Live Stripe keys'],
+            'stripe without webhook secret' => [['stripe' => ['webhook_secret' => '']], 'STRIPE_WEBHOOK_SECRET'],
+            'publishable key used as secret' => [['stripe' => ['secret_key' => 'pk_test_abc']], 'STRIPE_SECRET_KEY'],
+            'unknown fee payer' => [['payments' => ['fee_payer' => 'both']], 'PLATFORM_FEE_PAYER'],
         ];
+    }
+
+    public function testLiveStripeKeysAreRefusedEvenInDevelopmentUntilSignedOff(): void
+    {
+        $dev = ['env' => 'development', 'stripe' => ['secret_key' => 'sk_live_abc'], 'payments' => ['live_approved' => false]];
+        $this->assertStringContainsString('Live Stripe keys', implode(' ', ConfigValidator::problems($dev)));
+        $this->assertSame([], ConfigValidator::problems($this->config(['stripe' => ['secret_key' => 'sk_live_abc'], 'payments' => ['live_approved' => true]])));
     }
 
     public function testUnknownEnvironmentIsRefused(): void
