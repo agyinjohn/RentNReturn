@@ -41,7 +41,10 @@ $eventText = static function (array $e): string {
         <dt>Price</dt>
         <dd><?= Money::format((int) $rental['price_daily_pence']) ?>/day × <?= (int) $rental['days'] ?> = <strong><?= Money::format((int) $rental['total_pence']) ?></strong></dd>
         <dt><?= $isRenter ? 'Owner' : 'Renter' ?></dt>
-        <dd><?= htmlspecialchars($isRenter ? $rental['owner_name'] : $rental['renter_name']) ?></dd>
+        <dd>
+          <a href="/people/<?= (int) ($isRenter ? $rental['owner_id'] : $rental['renter_id']) ?>"><?= htmlspecialchars($isRenter ? $rental['owner_name'] : $rental['renter_name']) ?></a>
+          <?= \App\Verification\TrustBadge::html((bool) ($isRenter ? $rental['owner_verified'] : $rental['renter_verified'])) ?>
+        </dd>
         <?php if ($rental['status'] === BookingStatus::AWAITING_PAYMENT && $rental['payment_due_at']): ?>
           <dt>Payment due by</dt>
           <dd><?= htmlspecialchars((new DateTimeImmutable($rental['payment_due_at'], new DateTimeZone('UTC')))->setTimezone(new DateTimeZone('Europe/London'))->format('j M Y, H:i')) ?> (UK time)</dd>

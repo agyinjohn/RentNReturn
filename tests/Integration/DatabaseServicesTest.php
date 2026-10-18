@@ -82,7 +82,7 @@ final class DatabaseServicesTest extends TestCase
         }
 
         $migrator = new Migrator($server, dirname(__DIR__, 2) . '/storage');
-        $this->assertSame(['2026_10_05_phase2_foundation', '2026_10_18_step1_accounts', '2026_10_18_step2_bookings'], $migrator->migrate());
+        $this->assertSame(['2026_10_05_phase2_foundation', '2026_10_18_step1_accounts', '2026_10_18_step2_bookings', '2026_10_18_step3_verification'], $migrator->migrate());
         $this->assertSame([], $migrator->migrate(), 'Second run must be a no-op');
 
         $this->assertSame(['drill', 'drill-2', 'drill-3', 'saw'], $server->query('SELECT slug FROM listings ORDER BY id')->fetchAll(\PDO::FETCH_COLUMN));

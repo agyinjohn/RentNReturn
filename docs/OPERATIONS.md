@@ -37,6 +37,20 @@ Set `MAIL_DRIVER=smtp`, `MAIL_HOST`, `MAIL_PORT` (587 with `MAIL_ENCRYPTION=tls`
 provider, otherwise verification and reset emails will land in spam. Delivery failures are logged
 (`"message":"Email delivery failed"`) and never shown to users.
 
+### SMS (Twilio)
+
+Mobile verification texts go through Twilio: set `SMS_DRIVER=twilio`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`
+and `TWILIO_FROM` (a UK number, or a Messaging Service SID starting `MG`). In the Twilio console, restrict
+**Geo permissions** to the United Kingdom as a second line of defence against SMS pumping fraud (the app already
+accepts only UK mobiles). Failures are logged as `"message":"SMS delivery failed"`.
+
+### Identity verification
+
+`IDENTITY_PROVIDER=none` until a provider is integrated (users see "coming soon"). `simulated` is for development
+demos only and is refused on staging/production. To inspect or change a user's status:
+`php bin/verification.php status <email>`, `... withdraw <email> "<reason>"`,
+`... record <provider> <reference> <verified|failed|expired|withdrawn>`. Every change is kept in `user_verifications`.
+
 ## 2. Deploying a release
 
 1. `php bin/backup.php --keep=14` on the target server.

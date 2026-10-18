@@ -28,7 +28,8 @@ $imgCount = count($images);
       <span class="availability unavailable">Check availability</span>
     <?php endif; ?>
     <div class="owner">
-      <span class="owner-name"><?= htmlspecialchars($listing['owner_name']) ?></span>
+      <a class="owner-name" href="/people/<?= (int) $listing['user_id'] ?>"><?= htmlspecialchars($listing['owner_name']) ?></a>
+      <?= \App\Verification\TrustBadge::html((bool) $listing['owner_verified']) ?>
       <span class="rating-placeholder">Rating — coming soon</span>
     </div>
     <div style="margin-bottom: 20px;">

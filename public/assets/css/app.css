@@ -713,3 +713,28 @@ body::after {
   border-radius: 50%; background: var(--color-accent);
 }
 .timeline-when { display: block; font-size: 0.8rem; color: var(--color-text-muted); }
+
+/* Verification */
+.verified-badge {
+  display: inline-block;
+  font-family: var(--font-sans);
+  letter-spacing: 0;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.verify-list { list-style: none; padding: 0; margin: 16px 0 0; }
+.verify-list li {
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px;
+  padding: 12px 0; border-top: 1px solid var(--color-border);
+}
+.verify-list li > span:last-child { display: flex; align-items: center; gap: 10px; }
+.verify-yes { color: var(--color-leaf); font-weight: 600; }
+.verify-no { color: var(--color-text-muted); }
+.verify-summary { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 12px 0 28px; }
+.meta { color: var(--color-text-muted); font-size: 0.9rem; }

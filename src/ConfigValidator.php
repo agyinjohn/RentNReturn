@@ -36,6 +36,15 @@ final class ConfigValidator
         } elseif (($config['mail']['host'] ?? '') === '') {
             $problems[] = 'MAIL_HOST is required when MAIL_DRIVER=smtp.';
         }
+        $sms = $config['sms'] ?? ['driver' => 'log'];
+        if (($sms['driver'] ?? 'log') !== 'twilio') {
+            $problems[] = 'SMS_DRIVER must be twilio outside development (the log driver does not send texts).';
+        } elseif (($sms['twilio_sid'] ?? '') === '' || ($sms['twilio_token'] ?? '') === '' || ($sms['twilio_from'] ?? '') === '') {
+            $problems[] = 'TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_FROM are required when SMS_DRIVER=twilio.';
+        }
+        if (($config['identity']['provider'] ?? 'none') === 'simulated') {
+            $problems[] = 'IDENTITY_PROVIDER=simulated is for development only (anyone could verify themselves).';
+        }
         if (($config['database']['password'] ?? '') === '') {
             $problems[] = 'DB_PASSWORD must be set outside development.';
         }

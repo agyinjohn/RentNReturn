@@ -11,7 +11,7 @@ $past = array_filter($rentals, fn($r) => $r['status'] !== 'pending' && !in_array
 $row = static function (array $r): string {
     return '<strong><a href="/rentals/' . (int) $r['id'] . '">' . htmlspecialchars($r['listing_title']) . '</a></strong> '
         . '<span class="status-badge status-' . BookingStatus::tone($r['status']) . '">' . htmlspecialchars(BookingStatus::label($r['status'])) . '</span><br>'
-        . '<span class="meta">' . htmlspecialchars($r['renter_name']) . ' — ' . htmlspecialchars($r['start_date']) . ' to ' . htmlspecialchars($r['end_date'])
+        . '<span class="meta">' . htmlspecialchars($r['renter_name']) . ' ' . \App\Verification\TrustBadge::html((bool) $r['renter_verified']) . ' — ' . htmlspecialchars($r['start_date']) . ' to ' . htmlspecialchars($r['end_date'])
         . ' (' . (int) $r['days'] . ' day' . ((int) $r['days'] === 1 ? '' : 's') . ') — ' . Money::format((int) $r['total_pence']) . '</span>';
 };
 ?>

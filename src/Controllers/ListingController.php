@@ -11,6 +11,7 @@ use App\Controller;
 use App\Database;
 use App\Logger;
 use App\Security;
+use App\Verification\TrustBadge;
 use App\Services\AiImageDescriptionServiceInterface;
 use App\Services\AiImageDescriptionServiceFactory;
 
@@ -24,7 +25,7 @@ class ListingController extends Controller
         $category = trim((string) ($_GET['category'] ?? ''));
         $sql = '
             SELECT l.id, l.slug, l.title, l.category, l.item_condition, l.price_daily_pence, l.available_now, l.final_description,
-                   u.name AS owner_name,
+                   ' . TrustBadge::publicNameSql('u') . ' AS owner_name, ' . TrustBadge::sql('u') . ' AS owner_verified,
                    (SELECT file_path FROM listing_images WHERE listing_id = l.id ORDER BY sort_order LIMIT 1) AS cover_image
             FROM listings l
             JOIN users u ON u.id = l.user_id
@@ -407,7 +408,7 @@ class ListingController extends Controller
         $user = Auth::user($this->config);
         $pdo = Database::get($this->config);
         $stmt = $pdo->prepare('
-            SELECT l.*, u.name AS owner_name
+            SELECT l.*, ' . TrustBadge::publicNameSql('u') . ' AS owner_name, ' . TrustBadge::sql('u') . ' AS owner_verified
             FROM listings l
             JOIN users u ON u.id = l.user_id
             WHERE l.slug = ? AND l.published = 1

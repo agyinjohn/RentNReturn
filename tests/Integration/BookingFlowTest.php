@@ -178,8 +178,10 @@ final class BookingFlowTest extends IntegrationTestCase
             $page = $who->get("/rentals/{$id}");
             $this->assertSame(200, $page->status);
             $this->assertStringContainsString('Approved — awaiting payment', $page->body);
-            $this->assertMatchesRegularExpression('/Requested by Renter \w+ \(renter\)/', $page->body);
-            $this->assertMatchesRegularExpression('/Approved by Owner \w+ \(owner\) — awaiting payment/', $page->body);
+            // Public names only (first name / display name), never the full legal name.
+            $this->assertStringContainsString('Requested by Renter (renter)', $page->body);
+            $this->assertStringContainsString('Approved by Owner (owner) — awaiting payment', $page->body);
+            $this->assertDoesNotMatchRegularExpression('/(Renter|Owner) [0-9a-f]{4}/', $page->body);
             $this->assertStringContainsString('Payment due by', $page->body);
             $this->assertStringContainsString('Need it for a fence', $page->body);
         }

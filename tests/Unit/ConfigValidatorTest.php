@@ -19,6 +19,8 @@ final class ConfigValidatorTest extends TestCase
             'session' => ['secure' => true],
             'mail' => ['driver' => 'smtp', 'host' => 'smtp.example.com'],
             'database' => ['password' => 'secret'],
+            'sms' => ['driver' => 'twilio', 'twilio_sid' => 'AC123', 'twilio_token' => 'tok', 'twilio_from' => '+447700900000'],
+            'identity' => ['provider' => 'none'],
         ], $overrides);
     }
 
@@ -55,6 +57,9 @@ final class ConfigValidatorTest extends TestCase
             'log mailer' => [['mail' => ['driver' => 'log']], 'MAIL_DRIVER'],
             'smtp without host' => [['mail' => ['host' => '']], 'MAIL_HOST'],
             'empty db password' => [['database' => ['password' => '']], 'DB_PASSWORD'],
+            'log sms driver' => [['sms' => ['driver' => 'log']], 'SMS_DRIVER'],
+            'twilio without credentials' => [['sms' => ['twilio_token' => '']], 'TWILIO_'],
+            'simulated identity provider' => [['identity' => ['provider' => 'simulated']], 'IDENTITY_PROVIDER=simulated'],
         ];
     }
 

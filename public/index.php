@@ -32,6 +32,15 @@ $router->post('/verify-email/resend', 'App\Controllers\EmailVerificationControll
 $router->get('/profile', 'App\Controllers\ProfileController::edit', true);
 $router->post('/profile', 'App\Controllers\ProfileController::update', true);
 
+// Verification (mobile code, identity check). Public member pages show only display name, badge and history.
+$router->get('/verify/phone', 'App\Controllers\VerificationController::phoneForm', true);
+$router->post('/verify/phone', 'App\Controllers\VerificationController::sendPhoneCode', true);
+$router->post('/verify/phone/confirm', 'App\Controllers\VerificationController::confirmPhone', true);
+$router->post('/verify/identity', 'App\Controllers\VerificationController::startIdentity', true);
+$router->get('/verify/identity/simulate', 'App\Controllers\VerificationController::simulateForm', true);
+$router->post('/verify/identity/simulate', 'App\Controllers\VerificationController::simulateSubmit', true);
+$router->get('/people/{id}', 'App\Controllers\PublicProfileController::show');
+
 // Listings (browse public; creating/publishing needs a verified email)
 $router->get('/listings', 'App\Controllers\ListingController::index');
 $router->get('/listings/create', 'App\Controllers\ListingController::createForm', true, true);

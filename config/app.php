@@ -80,6 +80,27 @@ return [
         'log_path' => getenv('MAIL_LOG_PATH') ?: $storagePath . '/logs/mail.log',
     ],
 
+    'sms' => [
+        // 'log' writes texts to storage/logs/sms.log (development only); 'twilio' sends them.
+        'driver' => getenv('SMS_DRIVER') ?: 'log',
+        'twilio_sid' => getenv('TWILIO_ACCOUNT_SID') ?: '',
+        'twilio_token' => getenv('TWILIO_AUTH_TOKEN') ?: '',
+        // A UK sender number (+44...) or a Messaging Service SID (MG...).
+        'twilio_from' => getenv('TWILIO_FROM') ?: '',
+        'twilio_base_url' => getenv('TWILIO_BASE_URL') ?: 'https://api.twilio.com',
+        'log_path' => getenv('SMS_LOG_PATH') ?: $storagePath . '/logs/sms.log',
+    ],
+
+    'identity' => [
+        // 'none' until a provider (e.g. Stripe Identity, Onfido) is integrated; 'simulated' = development only.
+        'provider' => getenv('IDENTITY_PROVIDER') ?: 'none',
+    ],
+
+    'verification' => [
+        'otp_ttl' => 600,
+        'otp_max_attempts' => 5,
+    ],
+
     'tokens' => [
         'password_reset_ttl' => 3600,
         'email_verify_ttl' => 86400,
@@ -105,6 +126,9 @@ return [
         'password_reset_ip' => [10, 3600],
         'signup_ip' => [10, 3600],
         'verify_resend_user' => [3, 3600],
+        'sms_user_hour' => [3, 3600],
+        'sms_user_day' => [5, 86400],
+        'sms_phone_hour' => [3, 3600],
         'ai_describe_user_hour' => [(int) (getenv('RATE_AI_PER_HOUR') ?: 10), 3600],
         'ai_describe_user_day' => [(int) (getenv('RATE_AI_PER_DAY') ?: 30), 86400],
     ],

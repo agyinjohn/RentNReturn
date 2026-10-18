@@ -51,7 +51,7 @@ class Auth
             return self::$user = null;
         }
         $pdo = Database::get($config);
-        $stmt = $pdo->prepare('SELECT id, email, email_verified_at, name, contact_preference, session_version FROM users WHERE id = ?');
+        $stmt = $pdo->prepare('SELECT id, email, email_verified_at, name, display_name, phone, phone_verified_at, identity_verified_at, contact_preference, session_version FROM users WHERE id = ?');
         $stmt->execute([$_SESSION['user_id']]);
         $user = $stmt->fetch();
         // A password change bumps session_version, which signs out every other session for that user.

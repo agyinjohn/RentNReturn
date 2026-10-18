@@ -30,6 +30,8 @@ You can still create the database in phpMyAdmin and import `storage/schema.sql`,
 | `APP_URL` | http://localhost:8080 | **must be https://** |
 | Session cookies | not Secure | Secure, HTTPS enforced (HSTS) |
 | `MAIL_DRIVER` | `log` | **must be `smtp`** |
+| `SMS_DRIVER` | `log` | **must be `twilio`** (with credentials) |
+| `IDENTITY_PROVIDER` | `none` or `simulated` | **never `simulated`** |
 | `DB_PASSWORD` | may be empty | **required** |
 
 The app refuses to start on staging/production if any of these are wrong. Check a server with `php bin/check-config.php`.
@@ -45,6 +47,7 @@ Set real environment variables on servers rather than shipping a `.env` file. Al
 | `php bin/restore.php <dir> --yes` | Restore a backup (overwrites the configured database) |
 | `php bin/cleanup.php` | Hourly housekeeping: expire unpaid approvals and stale requests, tokens/limits, drafts, temp files |
 | `php bin/package.php` | Build a clean, secret-free source zip in `build/` |
+| `php bin/verification.php status\|withdraw\|record …` | View a user's verification history; withdraw or record identity outcomes |
 | `composer test` | Run the test suite (needs a MySQL/MariaDB server; see below) |
 
 See [docs/OPERATIONS.md](docs/OPERATIONS.md) for deployment, backups/restore, logs and credential rotation.
@@ -63,6 +66,10 @@ CI runs it on every push (`.github/workflows/tests.yml`) against MySQL 8.0 and M
 
 - **Accounts:** sign up, email verification, log in/out, password reset, profile. Listing, publishing, requesting and
   accepting rentals require a verified email.
+- **Verification:** mobile number by SMS code (UK mobiles), identity check through a provider (simulated in
+  development until one is chosen), and the public **RentNReturn Verified ✓** badge (email + mobile + identity),
+  derived only from server-side results. Public pages use display names and never show legal names or contact
+  details; public member pages at `/people/{id}`. See [docs/STEP_3_REPORT.md](docs/STEP_3_REPORT.md).
 - **Listings:** 1–5 photos, AI-suggested title/description (Groq, Gemini or OpenAI; reviewed and edited by the owner
   before saving), category, condition, daily price in £, availability window. Publish/unpublish. With no AI key,
   or if the AI call fails, the owner writes the title and description themselves.
@@ -90,6 +97,8 @@ docs/            Operations runbook and stage reports
 public/          Web root (index.php, assets, uploads/)
 src/             PHP classes (App\ namespace)
   Booking/       Rental periods, money (pence), booking lifecycle and BookingService
+  Sms/           SMS sender (Twilio, or log file in development)
+  Verification/  Phone codes, identity providers, the trust badge rule
   Controllers/   Auth, PasswordReset, EmailVerification, Listings, Requests, Dashboard, Api
   Mail/          Mailer (SMTP via PHPMailer, or log file in development)
   Services/      AI image description providers

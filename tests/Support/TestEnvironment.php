@@ -81,6 +81,24 @@ final class TestEnvironment
         return self::tmpDir() . '/mail.log';
     }
 
+    public static function smsLogPath(): string
+    {
+        return self::tmpDir() . '/sms.log';
+    }
+
+    /** @return array<int, array{to: string, body: string}> texts "sent" with the log driver, oldest first */
+    public static function texts(?string $to = null): array
+    {
+        $lines = is_file(self::smsLogPath()) ? file(self::smsLogPath(), FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) : [];
+        $texts = array_map(static fn (string $l): array => json_decode($l, true), $lines ?: []);
+        return array_values(array_filter($texts, static fn (array $t): bool => $to === null || $t['to'] === $to));
+    }
+
+    public static function clearTexts(): void
+    {
+        @unlink(self::smsLogPath());
+    }
+
     public static function logDir(): string
     {
         return self::tmpDir() . '/logs';
@@ -104,6 +122,9 @@ final class TestEnvironment
             'DB_PASSWORD' => $db['password'],
             'MAIL_DRIVER' => 'log',
             'MAIL_LOG_PATH' => self::mailLogPath(),
+            'SMS_DRIVER' => 'log',
+            'SMS_LOG_PATH' => self::smsLogPath(),
+            'IDENTITY_PROVIDER' => 'none',
             'LOG_PATH' => self::logDir(),
             'AI_PROVIDER' => 'pipeline',
             'GROQ_API_KEY' => '',

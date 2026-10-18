@@ -13,11 +13,17 @@ CREATE TABLE users (
     password_hash VARCHAR(255) NOT NULL,
     session_version INT UNSIGNED NOT NULL DEFAULT 0,
     name VARCHAR(255) NOT NULL,
+    -- Public name shown on listings/profiles instead of the legal name (falls back to the first name).
+    display_name VARCHAR(60) NULL,
+    -- Verified mobile only (E.164). One number per account.
     phone VARCHAR(32) NULL,
     phone_verified_at TIMESTAMP NULL,
+    -- Set only by a trusted identity-provider result.
+    identity_verified_at DATETIME NULL,
     contact_preference ENUM('email', 'phone', 'both') NOT NULL DEFAULT 'email',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_users_phone (phone)
 ) ENGINE=InnoDB;
 
 -- Listings
@@ -159,7 +165,40 @@ CREATE TABLE rate_limits (
     INDEX idx_rate_limits_reset (reset_at)
 ) ENGINE=InnoDB;
 
+-- One-time SMS codes. Only a bcrypt hash of the code is stored.
+CREATE TABLE phone_verifications (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    phone VARCHAR(20) NOT NULL,
+    code_hash VARCHAR(255) NOT NULL,
+    attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    expires_at DATETIME NOT NULL,
+    consumed_at DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_phone_verifications_user (user_id, created_at),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Verification history (phone, identity): provider, status and reference only — never document images or ID numbers.
+CREATE TABLE user_verifications (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    type VARCHAR(16) NOT NULL,
+    provider VARCHAR(32) NOT NULL,
+    status VARCHAR(16) NOT NULL,
+    provider_reference VARCHAR(255) NULL,
+    detail VARCHAR(255) NULL,
+    verified_at DATETIME NULL,
+    failed_at DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_user_verifications_user (user_id, type, created_at),
+    INDEX idx_user_verifications_reference (provider, provider_reference),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 INSERT INTO schema_migrations (version) VALUES
     ('2026_10_05_phase2_foundation'),
     ('2026_10_18_step1_accounts'),
-    ('2026_10_18_step2_bookings');
+    ('2026_10_18_step2_bookings'),
+    ('2026_10_18_step3_verification');

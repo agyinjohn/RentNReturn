@@ -29,7 +29,7 @@ $category = $category ?? '';
           </a>
           <div class="card-body">
             <h3 class="card-title"><a href="/listings/<?= htmlspecialchars($item['slug']) ?>"><?= htmlspecialchars($item['title']) ?></a></h3>
-            <div class="card-meta"><?= htmlspecialchars($item['owner_name']) ?></div>
+            <div class="card-meta"><?= htmlspecialchars($item['owner_name']) ?> <?= \App\Verification\TrustBadge::html((bool) $item['owner_verified']) ?></div>
             <div class="card-price"><?= \App\Booking\Money::format((int) $item['price_daily_pence']) ?>/day</div>
             <?php if (!empty($item['available_now'])): ?>
               <span class="listing-detail availability" style="margin-top:8px;">Available now</span>

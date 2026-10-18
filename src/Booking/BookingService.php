@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Booking;
 
 use App\Logger;
+use App\Verification\TrustBadge;
 use PDO;
 
 /**
@@ -241,7 +242,7 @@ final class BookingService
      */
     public function findForUser(int $requestId, int $userId): ?array
     {
-        $stmt = $this->pdo->prepare(self::RENTAL_SELECT . ' WHERE r.id = ?');
+        $stmt = $this->pdo->prepare(self::rentalSelect() . ' WHERE r.id = ?');
         $stmt->execute([$requestId]);
         $rental = $stmt->fetch();
         if (!$rental) {
@@ -258,7 +259,7 @@ final class BookingService
     /** @return array[] rentals where the user is the renter */
     public function listForRenter(int $userId): array
     {
-        $stmt = $this->pdo->prepare(self::RENTAL_SELECT . ' WHERE r.renter_id = ? ORDER BY r.created_at DESC, r.id DESC');
+        $stmt = $this->pdo->prepare(self::rentalSelect() . ' WHERE r.renter_id = ? ORDER BY r.created_at DESC, r.id DESC');
         $stmt->execute([$userId]);
         return $stmt->fetchAll();
     }
@@ -266,7 +267,7 @@ final class BookingService
     /** @return array[] rentals for the user's listings */
     public function listForOwner(int $userId): array
     {
-        $stmt = $this->pdo->prepare(self::RENTAL_SELECT . ' WHERE l.user_id = ? ORDER BY r.created_at DESC, r.id DESC');
+        $stmt = $this->pdo->prepare(self::rentalSelect() . ' WHERE l.user_id = ? ORDER BY r.created_at DESC, r.id DESC');
         $stmt->execute([$userId]);
         return $stmt->fetchAll();
     }
@@ -275,7 +276,7 @@ final class BookingService
     public function timeline(int $requestId): array
     {
         $stmt = $this->pdo->prepare('
-            SELECT e.*, u.name AS actor_name FROM booking_events e
+            SELECT e.*, ' . TrustBadge::publicNameSql('u') . ' AS actor_name FROM booking_events e
             LEFT JOIN users u ON u.id = e.actor_user_id
             WHERE e.rental_request_id = ? ORDER BY e.created_at, e.id
         ');
@@ -283,18 +284,23 @@ final class BookingService
         return $stmt->fetchAll();
     }
 
-    private const RENTAL_SELECT = '
+    /** Rental + booking + parties. Names and badges come from TrustBadge, the single definition of both. */
+    private static function rentalSelect(): string
+    {
+        return '
         SELECT r.id, r.listing_id, r.renter_id, l.user_id AS owner_id, r.start_date, r.end_date, r.message, r.created_at,
                r.price_daily_pence, r.days, r.total_pence, r.status AS request_status,
                b.id AS booking_id, b.status AS booking_status, b.payment_due_at, b.confirmed_at,
                COALESCE(b.status, r.status) AS status,
                l.title AS listing_title, l.slug AS listing_slug,
-               renter.name AS renter_name, owner.name AS owner_name
+               ' . TrustBadge::publicNameSql('renter') . ' AS renter_name, ' . TrustBadge::publicNameSql('owner') . ' AS owner_name,
+               ' . TrustBadge::sql('renter') . ' AS renter_verified, ' . TrustBadge::sql('owner') . ' AS owner_verified
         FROM rental_requests r
         JOIN listings l ON l.id = r.listing_id
         JOIN users renter ON renter.id = r.renter_id
         JOIN users owner ON owner.id = l.user_id
         LEFT JOIN bookings b ON b.rental_request_id = r.id';
+    }
 
     // ---------------------------------------------------------------- internals
 

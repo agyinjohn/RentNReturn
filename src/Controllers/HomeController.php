@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Auth;
 use App\Controller;
 use App\Database;
+use App\Verification\TrustBadge;
 
 class HomeController extends Controller
 {
@@ -16,7 +17,7 @@ class HomeController extends Controller
         $pdo = Database::get($this->config);
         $stmt = $pdo->query('
             SELECT l.id, l.slug, l.title, l.category, l.price_daily_pence, l.available_now, l.published,
-                   u.name AS owner_name,
+                   ' . TrustBadge::publicNameSql('u') . ' AS owner_name, ' . TrustBadge::sql('u') . ' AS owner_verified,
                    (SELECT file_path FROM listing_images WHERE listing_id = l.id ORDER BY sort_order LIMIT 1) AS cover_image
             FROM listings l
             JOIN users u ON u.id = l.user_id

@@ -22,6 +22,7 @@ abstract class IntegrationTestCase extends TestCase
         // Each test starts with no rate-limit history and an empty mailbox.
         $this->db()->exec('DELETE FROM rate_limits');
         TestEnvironment::clearEmails();
+        TestEnvironment::clearTexts();
     }
 
     protected function db(): PDO
