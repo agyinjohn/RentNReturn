@@ -47,6 +47,25 @@ final class Browser
         return $m[1] ?? '';
     }
 
+    /**
+     * A ready-to-run POST (with this browser's cookies and a fresh CSRF token) for curl_multi, so tests can
+     * fire several requests at the same moment. The caller runs it and reads the result.
+     */
+    public function preparePost(string $path, array $fields = []): \CurlHandle
+    {
+        $fields['_csrf'] = $this->csrfToken();
+        $ch = curl_init($this->baseUrl . $path);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_COOKIEFILE => $this->cookieJar,
+            CURLOPT_TIMEOUT => 60,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => http_build_query($fields),
+        ]);
+        return $ch;
+    }
+
     public function sessionId(): ?string
     {
         foreach (file($this->cookieJar) ?: [] as $line) {

@@ -15,7 +15,7 @@ class HomeController extends Controller
         $user = Auth::user($this->config);
         $pdo = Database::get($this->config);
         $stmt = $pdo->query('
-            SELECT l.id, l.slug, l.title, l.category, l.price_daily, l.available_now, l.published,
+            SELECT l.id, l.slug, l.title, l.category, l.price_daily_pence, l.available_now, l.published,
                    u.name AS owner_name,
                    (SELECT file_path FROM listing_images WHERE listing_id = l.id ORDER BY sort_order LIMIT 1) AS cover_image
             FROM listings l

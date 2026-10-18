@@ -1,4 +1,7 @@
 <?php
+use App\Booking\BookingStatus;
+use App\Booking\Money;
+
 ob_start();
 $currentUser = $user ?? null;
 ?>
@@ -17,9 +20,11 @@ $currentUser = $user ?? null;
       <?php foreach ($requests as $r): ?>
         <li>
           <div>
-            <strong><a href="/listings/<?= htmlspecialchars($r['listing_slug']) ?>"><?= htmlspecialchars($r['listing_title']) ?></a></strong><br>
-            <span class="meta">Owner: <?= htmlspecialchars($r['owner_name']) ?> — <?= htmlspecialchars($r['start_date']) ?> to <?= htmlspecialchars($r['end_date']) ?> — <?= htmlspecialchars($r['status']) ?></span>
+            <strong><a href="/rentals/<?= (int) $r['id'] ?>"><?= htmlspecialchars($r['listing_title']) ?></a></strong>
+            <span class="status-badge status-<?= BookingStatus::tone($r['status']) ?>"><?= htmlspecialchars(BookingStatus::label($r['status'])) ?></span><br>
+            <span class="meta">Owner: <?= htmlspecialchars($r['owner_name']) ?> — <?= htmlspecialchars($r['start_date']) ?> to <?= htmlspecialchars($r['end_date']) ?> — <?= Money::format((int) $r['total_pence']) ?></span>
           </div>
+          <div class="actions"><a href="/rentals/<?= (int) $r['id'] ?>" class="btn btn-ghost btn-sm">View</a></div>
         </li>
       <?php endforeach; ?>
     </ul>

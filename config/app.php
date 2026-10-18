@@ -85,6 +85,18 @@ return [
         'email_verify_ttl' => 86400,
     ],
 
+    // Rental rules. Dates are UK calendar dates; see src/Booking/RentalPeriod.php for how days are counted.
+    'bookings' => [
+        // How long a renter has to pay after the owner approves (capped at the start of the rental's first day).
+        'payment_window_hours' => (int) (getenv('BOOKING_PAYMENT_WINDOW_HOURS') ?: 24),
+        // ...but never less than this, so a same-day rental can still be paid.
+        'min_payment_window_minutes' => 60,
+        'max_rental_days' => (int) (getenv('BOOKING_MAX_RENTAL_DAYS') ?: 60),
+        'max_advance_days' => (int) (getenv('BOOKING_MAX_ADVANCE_DAYS') ?: 365),
+        // Highest daily price an owner can set: £10,000.00
+        'max_price_pence' => 1000000,
+    ],
+
     // [max attempts, window seconds]
     'rate_limits' => [
         'login_email' => [(int) (getenv('RATE_LOGIN_PER_EMAIL') ?: 5), 900],

@@ -28,7 +28,7 @@ CREATE TABLE listings (
     slug VARCHAR(255) NOT NULL,
     category VARCHAR(64) NOT NULL,
     item_condition VARCHAR(64) NOT NULL,
-    price_daily DECIMAL(10, 2) NOT NULL,
+    price_daily_pence INT UNSIGNED NOT NULL,
     ai_suggested_description TEXT NULL,
     final_description TEXT NOT NULL,
     ai_detected_attributes JSON NULL,
@@ -42,7 +42,9 @@ CREATE TABLE listings (
     INDEX idx_listings_published (published),
     INDEX idx_listings_category (category),
     UNIQUE KEY uq_listings_slug (slug),
-    FULLTEXT idx_listings_search (title, final_description)
+    FULLTEXT idx_listings_search (title, final_description),
+    CONSTRAINT chk_listings_price CHECK (price_daily_pence > 0),
+    CONSTRAINT chk_listings_window CHECK (available_from IS NULL OR available_until IS NULL OR available_until >= available_from)
 ) ENGINE=InnoDB;
 
 -- Listing images (2-5 per listing)
@@ -64,7 +66,11 @@ CREATE TABLE rental_requests (
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
     message TEXT NULL,
-    status ENUM('pending', 'accepted', 'declined') NOT NULL DEFAULT 'pending',
+    -- Price quoted at request time, in pence. days counts both start and end dates.
+    price_daily_pence INT UNSIGNED NOT NULL DEFAULT 0,
+    days SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    total_pence INT UNSIGNED NOT NULL DEFAULT 0,
+    status VARCHAR(32) NOT NULL DEFAULT 'pending',
     responded_at TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -72,10 +78,13 @@ CREATE TABLE rental_requests (
     FOREIGN KEY (renter_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_rental_requests_listing (listing_id),
     INDEX idx_rental_requests_renter (renter_id),
-    INDEX idx_rental_requests_status (status)
+    INDEX idx_rental_requests_status (status),
+    CONSTRAINT chk_requests_dates CHECK (end_date >= start_date),
+    CONSTRAINT chk_requests_status CHECK (status IN ('pending','accepted','declined','cancelled','expired')),
+    CONSTRAINT chk_requests_total CHECK (total_pence = days * price_daily_pence)
 ) ENGINE=InnoDB;
 
--- Bookings (accepted requests; no payment in MVP)
+-- Bookings (approved requests). Lifecycle in src/Booking/BookingStatus.php.
 CREATE TABLE bookings (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     rental_request_id INT UNSIGNED NOT NULL UNIQUE,
@@ -85,6 +94,11 @@ CREATE TABLE bookings (
     start_date DATE NOT NULL,
     end_date DATE NOT NULL,
     status VARCHAR(32) NOT NULL DEFAULT 'approved_awaiting_payment',
+    price_daily_pence INT UNSIGNED NOT NULL DEFAULT 0,
+    days SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    total_pence INT UNSIGNED NOT NULL DEFAULT 0,
+    payment_due_at DATETIME NULL,
+    confirmed_at DATETIME NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (rental_request_id) REFERENCES rental_requests(id) ON DELETE CASCADE,
@@ -93,7 +107,28 @@ CREATE TABLE bookings (
     FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_bookings_owner (owner_id),
     INDEX idx_bookings_renter (renter_id),
-    INDEX idx_bookings_listing_dates_status (listing_id, start_date, end_date, status)
+    INDEX idx_bookings_listing_dates_status (listing_id, start_date, end_date, status),
+    INDEX idx_bookings_status_due (status, payment_due_at),
+    CONSTRAINT chk_bookings_dates CHECK (end_date >= start_date),
+    CONSTRAINT chk_bookings_status CHECK (status IN ('approved_awaiting_payment','confirmed','handover_ready','in_rental','return_pending','completed','cancelled','expired','refunded','disputed')),
+    CONSTRAINT chk_bookings_total CHECK (total_pence = days * price_daily_pence)
+) ENGINE=InnoDB;
+
+-- Booking history shared by renter and owner.
+CREATE TABLE booking_events (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    rental_request_id INT UNSIGNED NOT NULL,
+    booking_id INT UNSIGNED NULL,
+    actor_user_id INT UNSIGNED NULL,
+    actor_role VARCHAR(16) NOT NULL,
+    from_status VARCHAR(32) NULL,
+    to_status VARCHAR(32) NOT NULL,
+    note VARCHAR(255) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_booking_events_request (rental_request_id, created_at),
+    FOREIGN KEY (rental_request_id) REFERENCES rental_requests(id) ON DELETE CASCADE,
+    FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE,
+    FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- Applied migrations. A fresh install from this file already includes the ones below.
@@ -126,4 +161,5 @@ CREATE TABLE rate_limits (
 
 INSERT INTO schema_migrations (version) VALUES
     ('2026_10_05_phase2_foundation'),
-    ('2026_10_18_step1_accounts');
+    ('2026_10_18_step1_accounts'),
+    ('2026_10_18_step2_bookings');

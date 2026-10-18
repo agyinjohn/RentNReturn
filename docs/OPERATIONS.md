@@ -54,7 +54,7 @@ and `storage/schema.sql` is updated to match so fresh installs are identical.
 
 | Schedule | Command |
 |---|---|
-| hourly | `php bin/cleanup.php` |
+| hourly | `php bin/cleanup.php` (also expires unpaid approvals and unanswered requests) |
 | daily (e.g. 02:15) | `php bin/backup.php --keep=14` |
 
 Linux cron example: `15 2 * * * cd /var/www/rentnreturn && php bin/backup.php --keep=14 >> storage/logs/cron.log 2>&1`.

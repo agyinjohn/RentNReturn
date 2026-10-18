@@ -16,7 +16,7 @@ $imgCount = count($images);
       <?php endif; ?>
     </div>
     <h1><?= htmlspecialchars($listing['title']) ?></h1>
-    <div class="price">£<?= number_format((float)$listing['price_daily'], 2) ?>/day</div>
+    <div class="price"><?= \App\Booking\Money::format((int) $listing['price_daily_pence']) ?>/day</div>
     <?php if (!empty($listing['available_now'])): ?>
       <span class="availability">Available now</span>
     <?php elseif (!empty($listing['available_from']) || !empty($listing['available_until'])): ?>
@@ -49,12 +49,13 @@ $imgCount = count($images);
           <?= \App\Security::csrfField() ?>
           <div class="form-group">
             <label for="start_date">Start date</label>
-            <input type="date" id="start_date" name="start_date" min="<?= date('Y-m-d') ?>" required>
+            <input type="date" id="start_date" name="start_date" min="<?= htmlspecialchars(max($today, (string) $listing['available_from'])) ?>"<?= $listing['available_until'] ? ' max="' . htmlspecialchars($listing['available_until']) . '"' : '' ?> required>
           </div>
           <div class="form-group">
             <label for="end_date">End date</label>
-            <input type="date" id="end_date" name="end_date" min="<?= date('Y-m-d') ?>" required>
+            <input type="date" id="end_date" name="end_date" min="<?= htmlspecialchars(max($today, (string) $listing['available_from'])) ?>"<?= $listing['available_until'] ? ' max="' . htmlspecialchars($listing['available_until']) . '"' : '' ?> required>
           </div>
+          <p class="form-hint">Both dates count as rental days (for example, Monday to Wednesday is 3 days). Up to <?= (int) $rules['max_rental_days'] ?> days. The total is <?= \App\Booking\Money::format((int) $listing['price_daily_pence']) ?> × number of days, confirmed when you send the request.</p>
           <div class="form-group">
             <label for="message">Message (optional)</label>
             <textarea id="message" name="message" placeholder="Introduce yourself or ask a question"></textarea>

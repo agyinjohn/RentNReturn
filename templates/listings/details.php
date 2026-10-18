@@ -44,7 +44,7 @@ $currentUser = $user ?? null;
         </div>
         <div class="form-group">
           <label for="price_daily">Price per day (£)</label>
-          <input type="number" id="price_daily" name="price_daily" required min="0.01" step="0.01">
+          <input type="text" id="price_daily" name="price_daily" required inputmode="decimal" pattern="£?\d{1,7}(\.\d{1,2})?" placeholder="e.g. 12.50">
         </div>
         <div class="form-group">
           <label>Availability</label>

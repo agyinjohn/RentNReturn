@@ -41,6 +41,33 @@ abstract class IntegrationTestCase extends TestCase
         return (int) $this->db()->lastInsertId();
     }
 
+    /** A published listing owned by $ownerId. Returns its ID. */
+    protected function createListing(int $ownerId, int $pricePence = 1000, ?string $from = null, ?string $until = null, string $title = 'Test Drill'): int
+    {
+        $slug = 'test-' . bin2hex(random_bytes(5));
+        $this->db()->prepare('
+            INSERT INTO listings (user_id, title, slug, category, item_condition, price_daily_pence, final_description, available_now, available_from, available_until, published)
+            VALUES (?, ?, ?, \'tools\', \'good\', ?, \'A test item.\', ?, ?, ?, 1)
+        ')->execute([$ownerId, $title, $slug, $pricePence, $from === null ? 1 : 0, $from, $until]);
+        return (int) $this->db()->lastInsertId();
+    }
+
+    /** UK calendar date $offset days from today, as Y-m-d. */
+    protected function day(int $offset): string
+    {
+        return \App\Booking\RentalPeriod::today()->modify(($offset >= 0 ? '+' : '') . $offset . ' days')->format('Y-m-d');
+    }
+
+    /** Signed-in browser for a new verified user. Returns [browser, userId]. */
+    protected function signedInUser(string $prefix = 'user', ?string $url = null): array
+    {
+        $email = $this->uniqueEmail($prefix);
+        $id = $this->createUser($email, 'correct-horse', true, ucfirst($prefix) . ' ' . substr(md5($email), 0, 4));
+        $b = new Browser($url ?? static::$url);
+        $b->login($email, 'correct-horse');
+        return [$b, $id];
+    }
+
     protected function uniqueEmail(string $prefix = 'user'): string
     {
         return $prefix . '-' . bin2hex(random_bytes(4)) . '@example.test';

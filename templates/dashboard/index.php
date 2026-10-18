@@ -1,6 +1,19 @@
 <?php
+use App\Booking\BookingStatus;
+use App\Booking\Money;
+
 ob_start();
 $currentUser = $user ?? null;
+$rentals = $rentals ?? [];
+$pending = array_filter($rentals, fn($r) => $r['status'] === 'pending');
+$current = array_filter($rentals, fn($r) => in_array($r['status'], BookingStatus::BLOCKING, true));
+$past = array_filter($rentals, fn($r) => $r['status'] !== 'pending' && !in_array($r['status'], BookingStatus::BLOCKING, true));
+$row = static function (array $r): string {
+    return '<strong><a href="/rentals/' . (int) $r['id'] . '">' . htmlspecialchars($r['listing_title']) . '</a></strong> '
+        . '<span class="status-badge status-' . BookingStatus::tone($r['status']) . '">' . htmlspecialchars(BookingStatus::label($r['status'])) . '</span><br>'
+        . '<span class="meta">' . htmlspecialchars($r['renter_name']) . ' — ' . htmlspecialchars($r['start_date']) . ' to ' . htmlspecialchars($r['end_date'])
+        . ' (' . (int) $r['days'] . ' day' . ((int) $r['days'] === 1 ? '' : 's') . ') — ' . Money::format((int) $r['total_pence']) . '</span>';
+};
 ?>
 <div class="wrap" style="padding: 32px 20px;">
   <h1 class="page-title">Dashboard</h1>
@@ -12,17 +25,14 @@ $currentUser = $user ?? null;
   <?php endif; ?>
   <div class="dashboard-section">
     <h2>Rental requests (pending)</h2>
-    <?php
-    $pending = array_filter($requests ?? [], fn($r) => $r['status'] === 'pending');
-    if (empty($pending)): ?>
+    <?php if (empty($pending)): ?>
       <p style="color: var(--color-text-muted);">No pending requests.</p>
     <?php else: ?>
       <ul class="req-list">
         <?php foreach ($pending as $r): ?>
           <li>
             <div>
-              <strong><a href="/listings/<?= htmlspecialchars($r['listing_slug']) ?>"><?= htmlspecialchars($r['listing_title']) ?></a></strong><br>
-              <span class="meta">From <?= htmlspecialchars($r['renter_name']) ?> — <?= htmlspecialchars($r['start_date']) ?> to <?= htmlspecialchars($r['end_date']) ?></span>
+              <?= $row($r) ?>
               <?php if (!empty($r['message'])): ?>
                 <br><span class="meta">Message: <?= htmlspecialchars($r['message']) ?></span>
               <?php endif; ?>
@@ -43,22 +53,27 @@ $currentUser = $user ?? null;
     <?php endif; ?>
   </div>
   <div class="dashboard-section">
-    <h2>Bookings / approved rentals</h2>
-    <?php if (empty($bookings)): ?>
-      <p style="color: var(--color-text-muted);">No bookings yet.</p>
+    <h2>Current bookings</h2>
+    <?php if (empty($current)): ?>
+      <p style="color: var(--color-text-muted);">No current bookings.</p>
     <?php else: ?>
       <ul class="booking-list">
-        <?php foreach ($bookings as $b): ?>
-          <li>
-            <div>
-              <strong><a href="/listings/<?= htmlspecialchars($b['listing_slug']) ?>"><?= htmlspecialchars($b['listing_title']) ?></a></strong><br>
-              <span class="meta">Renter: <?= htmlspecialchars($b['renter_name']) ?> — <?= htmlspecialchars($b['start_date']) ?> to <?= htmlspecialchars($b['end_date']) ?></span>
-            </div>
-          </li>
+        <?php foreach ($current as $r): ?>
+          <li><div><?= $row($r) ?></div><div class="actions"><a href="/rentals/<?= (int) $r['id'] ?>" class="btn btn-ghost btn-sm">View</a></div></li>
         <?php endforeach; ?>
       </ul>
     <?php endif; ?>
   </div>
+  <?php if (!empty($past)): ?>
+    <div class="dashboard-section">
+      <h2>Past and closed</h2>
+      <ul class="booking-list">
+        <?php foreach ($past as $r): ?>
+          <li><div><?= $row($r) ?></div></li>
+        <?php endforeach; ?>
+      </ul>
+    </div>
+  <?php endif; ?>
 </div>
 <?php
 $content = ob_get_clean();

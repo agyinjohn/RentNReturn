@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Auth;
+use App\Booking\Money;
+use App\Booking\RentalPeriod;
 use App\Controller;
 use App\Database;
 use App\Logger;
@@ -21,7 +23,7 @@ class ListingController extends Controller
         $keyword = trim((string) ($_GET['q'] ?? ''));
         $category = trim((string) ($_GET['category'] ?? ''));
         $sql = '
-            SELECT l.id, l.slug, l.title, l.category, l.item_condition, l.price_daily, l.available_now, l.final_description,
+            SELECT l.id, l.slug, l.title, l.category, l.item_condition, l.price_daily_pence, l.available_now, l.final_description,
                    u.name AS owner_name,
                    (SELECT file_path FROM listing_images WHERE listing_id = l.id ORDER BY sort_order LIMIT 1) AS cover_image
             FROM listings l
@@ -164,7 +166,8 @@ class ListingController extends Controller
         $finalDescription = trim((string) $draft['final_description']);
         $category = (string) ($_POST['category'] ?? '');
         $condition = (string) ($_POST['condition'] ?? '');
-        $priceDaily = isset($_POST['price_daily']) ? (float) $_POST['price_daily'] : 0.0;
+        // Parsed straight into integer pence — no floating-point money.
+        $pricePence = Money::parsePounds((string) ($_POST['price_daily'] ?? ''));
         $availableNow = isset($_POST['available_now']) && $_POST['available_now'] === '1';
         $availableFrom = !empty($_POST['available_from']) ? (string) $_POST['available_from'] : null;
         $availableUntil = !empty($_POST['available_until']) ? (string) $_POST['available_until'] : null;
@@ -179,8 +182,9 @@ class ListingController extends Controller
         if (!in_array($condition, array_values($this->config['conditions']), true)) {
             $errors[] = 'Please select a valid condition.';
         }
-        if ($priceDaily <= 0) {
-            $errors[] = 'Daily price must be greater than 0.';
+        $maxPrice = $this->config['bookings']['max_price_pence'];
+        if ($pricePence === null || $pricePence < 1 || $pricePence > $maxPrice) {
+            $errors[] = 'Please enter a daily price between £0.01 and ' . Money::format($maxPrice) . ', for example 12.50.';
         }
         if ($availableFrom && !\DateTimeImmutable::createFromFormat('!Y-m-d', $availableFrom)) {
             $errors[] = 'Available-from date is invalid.';
@@ -223,7 +227,7 @@ class ListingController extends Controller
         $slug = $this->uniqueSlug($title);
         $pdo = Database::get($this->config);
         $pdo->prepare('
-            INSERT INTO listings (user_id, title, slug, category, item_condition, price_daily, final_description, ai_suggested_description, available_now, available_from, available_until, published)
+            INSERT INTO listings (user_id, title, slug, category, item_condition, price_daily_pence, final_description, ai_suggested_description, available_now, available_from, available_until, published)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
         ')->execute([
             $user['id'],
@@ -231,7 +235,7 @@ class ListingController extends Controller
             $slug,
             $category,
             $condition,
-            $priceDaily,
+            $pricePence,
             $finalDescription,
             ($draft['suggested_description'] ?? '') !== '' ? $draft['suggested_description'] : null,
             $availableNow ? 1 : 0,
@@ -420,6 +424,8 @@ class ListingController extends Controller
         $listing['images'] = $stmt->fetchAll();
         $conditions = $this->config['conditions'];
         $categories = $this->config['categories'];
+        $today = RentalPeriod::today()->format('Y-m-d');
+        $rules = $this->config['bookings'];
         include $this->config['base_path'] . '/templates/listings/show.php';
     }
 

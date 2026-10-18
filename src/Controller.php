@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App;
 
+use App\Booking\BookingService;
 use App\Mail\Mailer;
 
 abstract class Controller
@@ -42,6 +43,11 @@ abstract class Controller
     protected function mailer(): Mailer
     {
         return new Mailer($this->config);
+    }
+
+    protected function bookings(): BookingService
+    {
+        return new BookingService(Database::get($this->config), $this->config['bookings']);
     }
 
     protected function tokens(): UserTokens

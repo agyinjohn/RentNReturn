@@ -681,3 +681,35 @@ body::after {
   font-size: 0.8rem;
 }
 .form-hint a { color: var(--color-primary); }
+
+/* Booking status and history */
+.status-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  vertical-align: middle;
+  border: 1px solid transparent;
+}
+.status-waiting { background: #fdf6e3; color: #6b5310; border-color: #f0e2b4; }
+.status-active { background: #e8f3ea; color: #2d4534; border-color: #c4dfc9; }
+.status-done { background: var(--color-ground); color: var(--color-primary); border-color: var(--color-border); }
+.status-alert { background: #fbeaea; color: #8a2727; border-color: #f0c9c9; }
+.status-closed { background: #f1f1ef; color: var(--color-text-muted); border-color: var(--color-border); }
+
+.rental-facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 16px 0; }
+.rental-facts dt { color: var(--color-text-muted); }
+.rental-facts dd { margin: 0; }
+@media (max-width: 480px) {
+  .rental-facts { grid-template-columns: 1fr; }
+  .rental-facts dd { margin-bottom: 8px; }
+}
+
+.timeline { list-style: none; padding: 0; margin: 12px 0 0; border-left: 2px solid var(--color-border); }
+.timeline li { padding: 6px 0 10px 16px; position: relative; }
+.timeline li::before {
+  content: ""; position: absolute; left: -6px; top: 12px; width: 10px; height: 10px;
+  border-radius: 50%; background: var(--color-accent);
+}
+.timeline-when { display: block; font-size: 0.8rem; color: var(--color-text-muted); }

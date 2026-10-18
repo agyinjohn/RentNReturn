@@ -22,7 +22,7 @@ $currentUser = $user ?? null;
             <div class="info">
               <strong><a href="/listings/<?= htmlspecialchars($item['slug']) ?>"><?= htmlspecialchars($item['title']) ?></a></strong>
               <span class="badge <?= !empty($item['published']) ? 'published' : '' ?>"><?= !empty($item['published']) ? 'Published' : 'Draft' ?></span>
-              — £<?= number_format((float)$item['price_daily'], 2) ?>/day
+              — <?= \App\Booking\Money::format((int) $item['price_daily_pence']) ?>/day
             </div>
             <div>
               <?php if (!empty($item['published'])): ?>

@@ -55,5 +55,8 @@ $router->get('/requests', 'App\Controllers\RentalRequestController::myRequests',
 $router->get('/dashboard', 'App\Controllers\DashboardController::index', true);
 $router->post('/requests/{id}/accept', 'App\Controllers\RentalRequestController::accept', true, true);
 $router->post('/requests/{id}/decline', 'App\Controllers\RentalRequestController::decline', true);
+$router->get('/rentals/{id}', 'App\Controllers\RentalRequestController::show', true);
+$router->post('/rentals/{id}/cancel-request', 'App\Controllers\RentalRequestController::cancelRequest', true);
+$router->post('/rentals/{id}/status', 'App\Controllers\RentalRequestController::transition', true);
 
 $router->dispatch();

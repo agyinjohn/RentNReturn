@@ -67,7 +67,7 @@ final class ListingCreationTest extends IntegrationTestCase
         $listing = $this->db()->query('SELECT * FROM listings ORDER BY id DESC LIMIT 1')->fetch();
         $this->assertSame($title, $listing['title']);
         $this->assertSame($description, $listing['final_description']);
-        $this->assertSame('12.50', $listing['price_daily']);
+        $this->assertSame(1250, (int) $listing['price_daily_pence'], 'Price stored as integer pence');
 
         $image = $this->db()->query('SELECT file_path FROM listing_images WHERE listing_id = ' . (int) $listing['id'])->fetchColumn();
         $this->assertNotFalse($image, 'The uploaded photo becomes the listing image');

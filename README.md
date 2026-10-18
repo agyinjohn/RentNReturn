@@ -43,7 +43,7 @@ Set real environment variables on servers rather than shipping a `.env` file. Al
 | `php bin/check-config.php` | Deployment check: safe config, DB reachable and migrated, storage writable |
 | `php bin/backup.php --keep=14` | Back up database + listing photos to `storage/backups/` |
 | `php bin/restore.php <dir> --yes` | Restore a backup (overwrites the configured database) |
-| `php bin/cleanup.php` | Hourly housekeeping: expired tokens/limits, abandoned drafts, temp files |
+| `php bin/cleanup.php` | Hourly housekeeping: expire unpaid approvals and stale requests, tokens/limits, drafts, temp files |
 | `php bin/package.php` | Build a clean, secret-free source zip in `build/` |
 | `composer test` | Run the test suite (needs a MySQL/MariaDB server; see below) |
 
@@ -67,8 +67,11 @@ CI runs it on every push (`.github/workflows/tests.yml`) against MySQL 8.0 and M
   before saving), category, condition, daily price in £, availability window. Publish/unpublish. With no AI key,
   or if the AI call fails, the owner writes the title and description themselves.
 - **Browse:** keyword search, category filter, listing pages.
-- **Requests:** renters request dates; owners accept/decline. Acceptance re-checks availability inside a locked
-  transaction and creates a booking in `approved_awaiting_payment` (no payment yet).
+- **Rentals:** renters request dates (UK dates, both ends inclusive, priced in integer pence on the server); owners
+  approve/decline. Approval re-checks availability under a lock on the listing and creates a booking awaiting
+  payment with a deadline, after which the dates are released. Shared booking page for renter and owner with the
+  lifecycle (confirmed → handover → in rental → returned → completed) and a full history. Online payment is
+  Step 4; see [docs/STEP_2_REPORT.md](docs/STEP_2_REPORT.md).
 
 ## Security
 
@@ -86,6 +89,7 @@ config/          App settings (env-driven), categories, conditions
 docs/            Operations runbook and stage reports
 public/          Web root (index.php, assets, uploads/)
 src/             PHP classes (App\ namespace)
+  Booking/       Rental periods, money (pence), booking lifecycle and BookingService
   Controllers/   Auth, PasswordReset, EmailVerification, Listings, Requests, Dashboard, Api
   Mail/          Mailer (SMTP via PHPMailer, or log file in development)
   Services/      AI image description providers
