@@ -646,3 +646,38 @@ body::after {
 .not-found a:hover {
   text-decoration: underline;
 }
+
+/* Messages and notices */
+.form-error,
+.form-success,
+.form-notice {
+  padding: 12px 14px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+.form-error { background: #fbeaea; color: #8a2727; border: 1px solid #f0c9c9; }
+.form-success { background: #e8f3ea; color: #2d4534; border: 1px solid #c4dfc9; }
+.form-notice { background: #fdf6e3; color: #6b5310; border: 1px solid #f0e2b4; }
+
+.notice-banner {
+  background: #fdf6e3;
+  border-bottom: 1px solid #f0e2b4;
+  color: #6b5310;
+  font-size: 0.95rem;
+  padding: 10px 0;
+}
+.notice-banner .wrap { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.notice-banner a { color: inherit; font-weight: 600; }
+
+.error-detail {
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  background: var(--color-ground);
+  padding: 16px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+}
+.form-hint a { color: var(--color-primary); }

@@ -1,5 +1,6 @@
--- P2P Rental Marketplace - Schema
--- Run this to create the database and tables.
+-- RentNReturn — full schema for a fresh install.
+-- Preferred: php bin/migrate.php (creates tables from this file on an empty database, then applies migrations).
+-- Manual alternative: import this file in phpMyAdmin/mysql. Existing databases: use migrations instead.
 
 CREATE DATABASE IF NOT EXISTS p2p_rent CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE p2p_rent;
@@ -10,6 +11,7 @@ CREATE TABLE users (
     email VARCHAR(255) NOT NULL UNIQUE,
     email_verified_at TIMESTAMP NULL,
     password_hash VARCHAR(255) NOT NULL,
+    session_version INT UNSIGNED NOT NULL DEFAULT 0,
     name VARCHAR(255) NOT NULL,
     phone VARCHAR(32) NULL,
     phone_verified_at TIMESTAMP NULL,
@@ -100,4 +102,28 @@ CREATE TABLE schema_migrations (
     applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
-INSERT INTO schema_migrations (version) VALUES ('2026_10_05_phase2_foundation');
+-- Single-use email verification / password reset tokens. Only SHA-256 hashes are stored.
+CREATE TABLE user_tokens (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id INT UNSIGNED NOT NULL,
+    purpose VARCHAR(32) NOT NULL,
+    token_hash CHAR(64) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_user_tokens_hash (token_hash),
+    INDEX idx_user_tokens_user_purpose (user_id, purpose),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Fixed-window rate limit counters (login, password reset, signup, AI requests). bucket is a SHA-256 hash.
+CREATE TABLE rate_limits (
+    bucket CHAR(64) NOT NULL PRIMARY KEY,
+    hits INT UNSIGNED NOT NULL DEFAULT 0,
+    reset_at INT UNSIGNED NOT NULL,
+    INDEX idx_rate_limits_reset (reset_at)
+) ENGINE=InnoDB;
+
+INSERT INTO schema_migrations (version) VALUES
+    ('2026_10_05_phase2_foundation'),
+    ('2026_10_18_step1_accounts');

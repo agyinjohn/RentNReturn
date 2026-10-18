@@ -14,15 +14,19 @@ class Router
         $this->config = $config;
     }
 
-    public function get(string $path, string $handler, bool $auth = false): self
+    /**
+     * @param bool $auth     require a signed-in user
+     * @param bool $verified require a signed-in user with a verified email (sensitive marketplace actions)
+     */
+    public function get(string $path, string $handler, bool $auth = false, bool $verified = false): self
     {
-        $this->routes[] = ['GET', $path, $handler, $auth];
+        $this->routes[] = ['GET', $path, $handler, $auth || $verified, $verified];
         return $this;
     }
 
-    public function post(string $path, string $handler, bool $auth = false): self
+    public function post(string $path, string $handler, bool $auth = false, bool $verified = false): self
     {
-        $this->routes[] = ['POST', $path, $handler, $auth];
+        $this->routes[] = ['POST', $path, $handler, $auth || $verified, $verified];
         return $this;
     }
 
@@ -33,7 +37,7 @@ class Router
         $uri = rtrim($uri, '/') ?: '/';
 
         foreach ($this->routes as $route) {
-            [$routeMethod, $pattern, $handler, $auth] = $route;
+            [$routeMethod, $pattern, $handler, $auth, $verified] = $route;
             if ($routeMethod !== $method) {
                 continue;
             }
@@ -44,8 +48,22 @@ class Router
                     echo 'Your session security token expired or was invalid. Please go back, refresh the page and try again.';
                     return;
                 }
+                $isApi = str_starts_with($uri, '/api/');
                 if ($auth && !Auth::check($this->config)) {
+                    if ($isApi) {
+                        $this->jsonError(401, 'Please log in.');
+                        return;
+                    }
                     header('Location: /login');
+                    exit;
+                }
+                if ($verified && !Auth::isVerified(Auth::user($this->config))) {
+                    if ($isApi) {
+                        $this->jsonError(403, 'Please verify your email address first.');
+                        return;
+                    }
+                    $_SESSION['verify_notice'] = 'Please verify your email address before listing or renting items.';
+                    header('Location: /verify-email');
                     exit;
                 }
                 [$class, $action] = explode('::', $handler);
@@ -58,6 +76,13 @@ class Router
         $config = $this->config;
         $currentUser = \App\Auth::user($config);
         echo $this->render('404', ['currentUser' => $currentUser]);
+    }
+
+    private function jsonError(int $code, string $message): void
+    {
+        http_response_code($code);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['error' => $message]);
     }
 
     private function match(string $pattern, string $uri): ?array

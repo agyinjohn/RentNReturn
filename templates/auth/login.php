@@ -5,6 +5,9 @@ $currentUser = null;
 <div class="auth-page">
   <div class="auth-card">
     <h1>Log in</h1>
+    <?php if (!empty($notice)): ?>
+      <div class="form-success"><?= htmlspecialchars($notice) ?></div>
+    <?php endif; ?>
     <?php if (!empty($error)): ?>
       <div class="form-error"><?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
@@ -17,6 +20,7 @@ $currentUser = null;
       <div class="form-group">
         <label for="password">Password</label>
         <input type="password" id="password" name="password" required autocomplete="current-password">
+        <p class="form-hint"><a href="/forgot-password">Forgot your password?</a></p>
       </div>
       <button type="submit" class="btn btn-primary">Log in</button>
     </form>

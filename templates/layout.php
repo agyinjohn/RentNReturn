@@ -38,7 +38,19 @@ $pageTitle = $pageTitle ?? 'RentNReturn';
       </nav>
     </div>
   </header>
+  <?php if ($currentUser && empty($currentUser['email_verified_at']) && empty($hideVerifyBanner)): ?>
+    <div class="notice-banner">
+      <div class="wrap">
+        <span>Please verify your email address to list or rent items.</span>
+        <a href="/verify-email">Resend verification email</a>
+      </div>
+    </div>
+  <?php endif; ?>
   <main class="main">
+    <?php if (!empty($_SESSION['flash_success'])): ?>
+      <div class="wrap" style="padding-top: 20px;"><div class="form-success"><?= htmlspecialchars($_SESSION['flash_success']) ?></div></div>
+      <?php unset($_SESSION['flash_success']); ?>
+    <?php endif; ?>
     <?= $content ?? '' ?>
   </main>
   <footer style="text-align: center; padding: 32px 20px; color: var(--color-text-muted); font-size: 0.9rem;">

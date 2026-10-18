@@ -7,6 +7,7 @@ namespace App\Controllers;
 use App\Auth;
 use App\Controller;
 use App\Database;
+use App\Logger;
 use App\Security;
 use App\Services\AiImageDescriptionServiceInterface;
 use App\Services\AiImageDescriptionServiceFactory;
@@ -17,8 +18,6 @@ class ListingController extends Controller
     {
         $user = Auth::user($this->config);
         $pdo = Database::get($this->config);
-        $keyword = trim((string) ($_GET['q'] ?? ''));
-        $category = trim((string) ($_GET['category'] ?? ''));
         $keyword = trim((string) ($_GET['q'] ?? ''));
         $category = trim((string) ($_GET['category'] ?? ''));
         $sql = '
@@ -69,38 +68,46 @@ class ListingController extends Controller
             return;
         }
         $uploadConfig = $this->config['upload'];
-        $uploadDir = $uploadConfig['listing_images_path'];
+        // Drafts are stored outside public/ and served only to their owner (see draftImage()).
+        $uploadDir = $uploadConfig['draft_images_path'];
         if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
+            mkdir($uploadDir, 0750, true);
         }
         $allowedTypes = $uploadConfig['allowed_types'];
         $maxSize = $uploadConfig['max_size_mb'] * 1024 * 1024;
 
         $errors = [];
-        if (empty($_FILES['image']['name']) || !is_uploaded_file($_FILES['image']['tmp_name'])) {
+        $uploadError = $_FILES['image']['error'] ?? UPLOAD_ERR_NO_FILE;
+        if (in_array($uploadError, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+            // Rejected by PHP's own upload_max_filesize/post_max_size before the app sees it.
+            $errors[] = 'Please upload a JPEG, PNG or WebP photo under ' . $uploadConfig['max_size_mb'] . ' MB.';
+        } elseif ($uploadError !== UPLOAD_ERR_OK || !is_uploaded_file($_FILES['image']['tmp_name'])) {
             $errors[] = 'Please upload one photo.';
         } else {
             $tmp = $_FILES['image']['tmp_name'];
             $size = $_FILES['image']['size'];
-            $type = Security::detectImageType($tmp);
+            $type = Security::detectImageType($tmp, $uploadConfig);
             if ($size > $maxSize || $type === null || !in_array($type, $allowedTypes, true)) {
-                $errors[] = 'Invalid or oversized image.';
+                $errors[] = 'Please upload a JPEG, PNG or WebP photo under ' . $uploadConfig['max_size_mb'] . ' MB.';
             } else {
                 $ext = Security::imageExtension($type);
                 if ($ext === null) {
                     $errors[] = 'Invalid image type.';
                 } else {
+                    $this->discardDraftImage();
                     $basename = 'draft_' . bin2hex(random_bytes(8)) . '.' . $ext;
                     $path = $uploadDir . DIRECTORY_SEPARATOR . $basename;
                     if (!move_uploaded_file($tmp, $path)) {
                         $errors[] = 'Could not save image.';
+                    } elseif (!$this->allowAiRequest((int) $user['id'])) {
+                        @unlink($path);
+                        $errors[] = 'You have generated a lot of AI descriptions recently. Please wait a while and try again.';
                     } else {
                         try {
                             $ai = $this->getAiService();
                             $result = $ai->describeImages([$path]);
                             $_SESSION['listing_draft'] = [
                                 'image_path' => $path,
-                                'image_basename' => $basename,
                                 'suggested_title' => $result['title'],
                                 'suggested_description' => $result['description'],
                                 'attributes' => $result['attributes'],
@@ -109,6 +116,7 @@ class ListingController extends Controller
                             return;
                         } catch (\Throwable $e) {
                             @unlink($path);
+                            Logger::warning('AI description failed', ['error' => $e->getMessage()]);
                             $msg = $this->config['debug'] ?? false
                                 ? $e->getMessage()
                                 : 'AI description failed. Please try again.';
@@ -183,9 +191,9 @@ class ListingController extends Controller
                 for ($i = 0; $i < $count; $i++) {
                     $tmp = $_FILES['images']['tmp_name'][$i];
                     $size = $_FILES['images']['size'][$i];
-                    $type = Security::detectImageType($tmp);
+                    $type = Security::detectImageType($tmp, $uploadConfig);
                     if (!is_uploaded_file($tmp) || $size > $maxSize || $type === null || !in_array($type, $allowedTypes, true)) {
-                        $errors[] = 'Invalid or oversized image.';
+                        $errors[] = 'Please upload JPEG, PNG or WebP photos under ' . $uploadConfig['max_size_mb'] . ' MB each.';
                         break;
                     }
                     $ext = Security::imageExtension($type);
@@ -223,11 +231,15 @@ class ListingController extends Controller
         ]);
         $listingId = (int) $pdo->lastInsertId();
 
-        $draftPath = $draft['image_path'] ?? null;
-        if ($draftPath && is_file($draftPath)) {
+        $draftPath = $this->draftImagePath();
+        if ($draftPath !== null) {
             $basename = $listingId . '_0_' . bin2hex(random_bytes(4)) . '.' . pathinfo($draftPath, PATHINFO_EXTENSION);
             $newPath = $uploadDir . DIRECTORY_SEPARATOR . $basename;
-            rename($draftPath, $newPath);
+            if (!@rename($draftPath, $newPath)) {
+                // rename() can fail across filesystems; fall back to copy + delete.
+                copy($draftPath, $newPath);
+                @unlink($draftPath);
+            }
             $pdo->prepare('INSERT INTO listing_images (listing_id, file_path, sort_order) VALUES (?, ?, ?)')->execute([$listingId, 'uploads/listings/' . $basename, 0]);
         }
         foreach ($extraFiles as $idx => $file) {
@@ -343,7 +355,7 @@ class ListingController extends Controller
         unset($_SESSION['listing_error']);
         $categories = $this->config['categories'];
         $conditions = $this->config['conditions'];
-        $draftImageUrl = isset($draft['image_basename']) ? '/uploads/listings/' . htmlspecialchars($draft['image_basename']) : null;
+        $draftImageUrl = $this->draftImagePath() !== null ? '/listings/create/draft-image' : null;
         include $this->config['base_path'] . '/templates/listings/details.php';
     }
 
@@ -427,6 +439,43 @@ class ListingController extends Controller
         $stmt->execute([$id, $user['id']]);
         $_SESSION['listing_success'] = 'Listing unpublished.';
         $this->redirect('/listings/my');
+    }
+
+    /** Stream the signed-in user's own draft photo (drafts are not publicly addressable). */
+    public function draftImage(array $params = []): void
+    {
+        $path = $this->draftImagePath();
+        $type = $path !== null ? Security::detectImageType($path, $this->config['upload']) : null;
+        if ($type === null) {
+            http_response_code(404);
+            return;
+        }
+        header('Content-Type: ' . $type);
+        header('Content-Length: ' . filesize($path));
+        header('Cache-Control: private, no-store');
+        readfile($path);
+    }
+
+    /** Path of the current session's draft image, only if it really is inside the drafts directory. */
+    private function draftImagePath(): ?string
+    {
+        $path = $_SESSION['listing_draft']['image_path'] ?? null;
+        $dir = realpath($this->config['upload']['draft_images_path']);
+        $real = is_string($path) ? realpath($path) : false;
+        if ($dir === false || $real === false || !str_starts_with($real, $dir . DIRECTORY_SEPARATOR) || !is_file($real)) {
+            return null;
+        }
+        return $real;
+    }
+
+    /** Delete an abandoned draft image when the user starts a new listing draft. */
+    private function discardDraftImage(): void
+    {
+        $path = $this->draftImagePath();
+        if ($path !== null) {
+            @unlink($path);
+        }
+        unset($_SESSION['listing_draft']);
     }
 
     private function uniqueSlug(string $title, int $excludeId = 0): string

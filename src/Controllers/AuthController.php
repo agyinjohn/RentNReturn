@@ -7,9 +7,13 @@ namespace App\Controllers;
 use App\Auth;
 use App\Controller;
 use App\Database;
+use App\Logger;
 
 class AuthController extends Controller
 {
+    /** Verified against when the email is unknown, so response time does not reveal whether an account exists. */
+    private const DUMMY_HASH = '$2y$10$S7kQMX./cmBJ3vOsJ6h3H.XlQUMWYkpGt0KAp3HB5ZAg9tmStBvJq';
+
     public function loginForm(array $params = []): void
     {
         if (Auth::check($this->config)) {
@@ -17,43 +21,53 @@ class AuthController extends Controller
             return;
         }
         $error = $_SESSION['auth_error'] ?? null;
-        unset($_SESSION['auth_error']);
+        $notice = $_SESSION['auth_notice'] ?? null;
+        unset($_SESSION['auth_error'], $_SESSION['auth_notice']);
         include $this->config['base_path'] . '/templates/auth/login.php';
     }
 
     public function login(array $params = []): void
     {
-        $email = trim((string) ($_POST['email'] ?? ''));
+        $email = strtolower(trim((string) ($_POST['email'] ?? '')));
         $password = (string) ($_POST['password'] ?? '');
         if ($email === '' || $password === '') {
             $_SESSION['auth_error'] = 'Please enter email and password.';
             $this->redirect('/login');
             return;
         }
-        $now = time();
-        $attempts = $_SESSION['login_attempts'] ?? ['count' => 0, 'first_at' => $now];
-        if (($now - (int) $attempts['first_at']) > 900) {
-            $attempts = ['count' => 0, 'first_at' => $now];
-        }
-        if ((int) $attempts['count'] >= 8) {
-            $_SESSION['auth_error'] = 'Too many login attempts. Please wait and try again.';
+
+        // Limits are stored server-side per email and per IP, so clearing cookies does not reset them.
+        $limiter = $this->rateLimiter();
+        [$emailMax, $emailWindow] = $this->limit('login_email');
+        [$ipMax, $ipWindow] = $this->limit('login_ip');
+        $emailBucket = 'login:email:' . $email;
+        $ipBucket = 'login:ip:' . $this->clientIp();
+        if ($limiter->tooManyAttempts($emailBucket, $emailMax) || $limiter->tooManyAttempts($ipBucket, $ipMax)) {
+            Logger::warning('Login rate limited', ['ip' => $this->clientIp()]);
+            $_SESSION['auth_error'] = 'Too many login attempts. Please wait 15 minutes and try again, or reset your password.';
             $this->redirect('/login');
             return;
         }
 
         $pdo = Database::get($this->config);
-        $stmt = $pdo->prepare('SELECT id, password_hash FROM users WHERE email = ?');
+        $stmt = $pdo->prepare('SELECT id, password_hash, session_version FROM users WHERE email = ?');
         $stmt->execute([$email]);
         $user = $stmt->fetch();
-        if (!$user || !password_verify($password, $user['password_hash'])) {
-            $attempts['count'] = (int) $attempts['count'] + 1;
-            $_SESSION['login_attempts'] = $attempts;
+        $valid = password_verify($password, $user ? $user['password_hash'] : self::DUMMY_HASH);
+        if (!$user || !$valid) {
+            $limiter->hit($emailBucket, $emailWindow);
+            $limiter->hit($ipBucket, $ipWindow);
             $_SESSION['auth_error'] = 'Invalid email or password.';
             $this->redirect('/login');
             return;
         }
-        unset($_SESSION['login_attempts']);
-        Auth::login((int) $user['id']);
+
+        $limiter->clear($emailBucket);
+        if (password_needs_rehash($user['password_hash'], PASSWORD_DEFAULT)) {
+            $pdo->prepare('UPDATE users SET password_hash = ? WHERE id = ?')->execute([password_hash($password, PASSWORD_DEFAULT), $user['id']]);
+        }
+        Auth::login((int) $user['id'], (int) $user['session_version']);
+        Logger::info('User logged in', ['user_id' => (int) $user['id']]);
         $this->redirect('/');
     }
 
@@ -70,7 +84,7 @@ class AuthController extends Controller
 
     public function signup(array $params = []): void
     {
-        $email = trim((string) ($_POST['email'] ?? ''));
+        $email = strtolower(trim((string) ($_POST['email'] ?? '')));
         $password = (string) ($_POST['password'] ?? '');
         $name = trim((string) ($_POST['name'] ?? ''));
         $contact = (string) ($_POST['contact_preference'] ?? 'email');
@@ -87,6 +101,9 @@ class AuthController extends Controller
         if (strlen($password) < 8) {
             $errors[] = 'Password must be at least 8 characters.';
         }
+        if (strlen($password) > 72) {
+            $errors[] = 'Password must be 72 characters or fewer.';
+        }
         if ($name === '') {
             $errors[] = 'Name is required.';
         }
@@ -95,19 +112,30 @@ class AuthController extends Controller
             $this->redirect('/signup');
             return;
         }
-        $pdo = Database::get($this->config);
-        $stmt = $pdo->prepare('SELECT id FROM users WHERE email = ?');
-        $stmt->execute([$email]);
-        if ($stmt->fetch()) {
-            $_SESSION['auth_error'] = 'An account with this email already exists.';
+        [$max, $window] = $this->limit('signup_ip');
+        if (!$this->rateLimiter()->attempt('signup:ip:' . $this->clientIp(), $max, $window)) {
+            $_SESSION['auth_error'] = 'Too many sign-up attempts. Please try again later.';
             $this->redirect('/signup');
             return;
         }
-        $hash = password_hash($password, PASSWORD_DEFAULT);
-        $stmt = $pdo->prepare('INSERT INTO users (email, password_hash, name, contact_preference) VALUES (?, ?, ?, ?)');
-        $stmt->execute([$email, $hash, $name, $contact]);
-        Auth::login((int) $pdo->lastInsertId());
-        $this->redirect('/');
+
+        $pdo = Database::get($this->config);
+        $stmt = $pdo->prepare('SELECT id, email, name FROM users WHERE email = ?');
+        $stmt->execute([$email]);
+        $existing = $stmt->fetch();
+        if ($existing) {
+            // Same response as a new signup, so the form cannot be used to discover registered emails.
+            // The real owner is told by email instead.
+            $this->mailer()->send($existing['email'], 'account_exists', ['name' => $existing['name']]);
+        } else {
+            $stmt = $pdo->prepare('INSERT INTO users (email, password_hash, name, contact_preference) VALUES (?, ?, ?, ?)');
+            $stmt->execute([$email, password_hash($password, PASSWORD_DEFAULT), $name, $contact]);
+            $userId = (int) $pdo->lastInsertId();
+            $this->sendVerificationEmail(['id' => $userId, 'email' => $email, 'name' => $name]);
+            Logger::info('User signed up', ['user_id' => $userId]);
+        }
+        $_SESSION['auth_notice'] = 'Thanks! We have sent an email to ' . $email . '. Click the link in it to verify your address, then log in.';
+        $this->redirect('/login');
     }
 
     public function logout(array $params = []): void

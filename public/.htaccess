@@ -1,6 +1,15 @@
+Options -Indexes
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
+
+  # Block hidden files (.env, .git, .htaccess...) but keep /.well-known/ (needed later for Apple Pay domain verification).
+  RewriteRule "(^|/)\.(?!well-known/)" - [F]
+
+  # Never execute or serve scripts from the uploads folder — only images live there.
+  RewriteRule ^uploads/.*\.(php\d?|phtml|phar|pl|py|cgi|sh|html?|svg)$ - [F,NC]
+
   # Serve existing files and directories
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d

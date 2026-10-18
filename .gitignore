@@ -1,4 +1,28 @@
-/vendor/
+# Secrets and machine-specific config — never commit
 .env
+.env.*
+!.env.example
+
+# Dependencies (composer install)
+/vendor/
+
+# Runtime data
 /public/uploads/
+/storage/logs/
+/storage/uploads/
+/storage/tmp/
+/storage/backups/
 *.log
+
+# Build output
+/build/
+/.phpunit.cache/
+.phpunit.result.cache
+
+# Tools / IDEs / OS
+/.claude/
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db

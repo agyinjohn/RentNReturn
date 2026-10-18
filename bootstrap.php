@@ -2,14 +2,17 @@
 
 declare(strict_types=1);
 
-// Optional: load .env into getenv (no extra package required)
+// Optional: load .env into getenv (no extra package required).
+// Real environment variables (set by the web server/host) always win over .env values.
 if (is_file(__DIR__ . '/.env')) {
     foreach (file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
         if (strpos(trim($line), '#') === 0) continue;
         if (preg_match('/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/', $line, $m)) {
             $v = trim($m[2]);
             if (preg_match('/^["\'](.+)["\']$/s', $v, $q)) $v = $q[1];
-            putenv(trim($m[1]) . '=' . $v);
+            if (getenv(trim($m[1])) === false) {
+                putenv(trim($m[1]) . '=' . $v);
+            }
         }
     }
 }
@@ -32,5 +35,10 @@ $config = require __DIR__ . '/config/app.php';
 $config['base_path'] = __DIR__;
 $config['categories'] = require __DIR__ . '/config/categories.php';
 $config['conditions'] = require __DIR__ . '/config/conditions.php';
+
+date_default_timezone_set($config['timezone']);
+App\Logger::configure($config);
+App\ErrorHandler::register($config);
+App\ConfigValidator::assertSafe($config);
 
 return $config;
