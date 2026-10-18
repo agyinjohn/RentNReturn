@@ -10,11 +10,14 @@ class OpenAiImageDescriptionService implements AiImageDescriptionServiceInterfac
 {
     private string $apiKey;
     private string $model;
+    private string $baseUrl;
 
-    public function __construct(string $apiKey, string $model = 'gpt-4o')
+    /** $baseUrl allows OpenAI-compatible gateways (and a local fake server in tests). */
+    public function __construct(string $apiKey, string $model = 'gpt-4o', string $baseUrl = 'https://api.openai.com/v1')
     {
         $this->apiKey = $apiKey;
         $this->model = $model;
+        $this->baseUrl = rtrim($baseUrl, '/');
     }
 
     public function describeImages(array $imagePaths): array
@@ -49,7 +52,7 @@ class OpenAiImageDescriptionService implements AiImageDescriptionServiceInterfac
         ];
 
         $verifySSL = (getenv('CURL_SSL_VERIFY') !== '0' && getenv('CURL_SSL_VERIFY') !== 'false');
-        $ch = curl_init('https://api.openai.com/v1/chat/completions');
+        $ch = curl_init($this->baseUrl . '/chat/completions');
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST => true,

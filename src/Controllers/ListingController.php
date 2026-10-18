@@ -56,10 +56,15 @@ class ListingController extends Controller
         }
         $error = $_SESSION['listing_error'] ?? null;
         unset($_SESSION['listing_error']);
+        $aiAvailable = AiImageDescriptionServiceFactory::isConfigured($this->config['ai']);
         include $this->config['base_path'] . '/templates/listings/create.php';
     }
 
-    /** Step 1: Upload one image → AI generates description → redirect to review */
+    /**
+     * Step 1: upload one photo → AI suggests title/description → review step.
+     * If AI is not configured, fails, or the user hit their AI limit, the photo is kept and the
+     * review step asks the owner to write the title and description themselves.
+     */
     public function describeImage(array $params = []): void
     {
         $user = Auth::user($this->config);
@@ -99,29 +104,20 @@ class ListingController extends Controller
                     $path = $uploadDir . DIRECTORY_SEPARATOR . $basename;
                     if (!move_uploaded_file($tmp, $path)) {
                         $errors[] = 'Could not save image.';
+                    } elseif (!AiImageDescriptionServiceFactory::isConfigured($this->config['ai'])) {
+                        $this->startDraft($path);
                     } elseif (!$this->allowAiRequest((int) $user['id'])) {
-                        @unlink($path);
-                        $errors[] = 'You have generated a lot of AI descriptions recently. Please wait a while and try again.';
+                        $this->startDraft($path, null, 'You have used your automatic descriptions for now, so please write the title and description yourself.');
                     } else {
                         try {
-                            $ai = $this->getAiService();
-                            $result = $ai->describeImages([$path]);
-                            $_SESSION['listing_draft'] = [
-                                'image_path' => $path,
-                                'suggested_title' => $result['title'],
-                                'suggested_description' => $result['description'],
-                                'attributes' => $result['attributes'],
-                            ];
-                            $this->redirect('/listings/create/review');
-                            return;
+                            $result = $this->getAiService()->describeImages([$path]);
                         } catch (\Throwable $e) {
-                            @unlink($path);
                             Logger::warning('AI description failed', ['error' => $e->getMessage()]);
-                            $msg = $this->config['debug'] ?? false
-                                ? $e->getMessage()
-                                : 'AI description failed. Please try again.';
-                            $errors[] = $msg;
+                            $result = null;
                         }
+                        $this->startDraft($path, $result, $result === null
+                            ? 'We could not generate a description automatically this time, so please write the title and description yourself.'
+                            : null);
                     }
                 }
             }
@@ -130,6 +126,19 @@ class ListingController extends Controller
             $_SESSION['listing_error'] = implode(' ', $errors);
         }
         $this->redirect('/listings/create');
+    }
+
+    /** Save the uploaded photo as the session's listing draft (with AI suggestions if any) and go to review. */
+    private function startDraft(string $imagePath, ?array $aiResult = null, ?string $notice = null): void
+    {
+        $_SESSION['listing_draft'] = [
+            'image_path' => $imagePath,
+            'suggested_title' => (string) ($aiResult['title'] ?? ''),
+            'suggested_description' => (string) ($aiResult['description'] ?? ''),
+            'attributes' => $aiResult['attributes'] ?? [],
+            'ai_notice' => $notice,
+        ];
+        $this->redirect('/listings/create/review');
     }
 
     public function create(array $params = []): void
@@ -224,7 +233,7 @@ class ListingController extends Controller
             $condition,
             $priceDaily,
             $finalDescription,
-            $draft['suggested_description'] ?? $finalDescription,
+            ($draft['suggested_description'] ?? '') !== '' ? $draft['suggested_description'] : null,
             $availableNow ? 1 : 0,
             $availableFrom ?: null,
             $availableUntil ?: null,
@@ -281,12 +290,15 @@ class ListingController extends Controller
         } elseif ($draft) {
             $listing = [
                 'id' => null,
-                'title' => $draft['suggested_title'] ?? 'Item',
+                'title' => $draft['suggested_title'] ?? '',
                 'ai_suggested_description' => $draft['suggested_description'] ?? '',
             ];
-            $suggestedTitle = $draft['suggested_title'] ?? 'Item';
+            $suggestedTitle = $draft['suggested_title'] ?? '';
             $attrs = $draft['attributes'] ?? [];
             $fromDraft = true;
+            $manual = ($draft['suggested_description'] ?? '') === '';
+            $aiNotice = $draft['ai_notice'] ?? null;
+            $draftImageUrl = $this->draftImagePath() !== null ? '/listings/create/draft-image' : null;
         } else {
             $this->redirect('/listings/create');
             return;

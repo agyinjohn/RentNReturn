@@ -64,7 +64,8 @@ CI runs it on every push (`.github/workflows/tests.yml`) against MySQL 8.0 and M
 - **Accounts:** sign up, email verification, log in/out, password reset, profile. Listing, publishing, requesting and
   accepting rentals require a verified email.
 - **Listings:** 1–5 photos, AI-suggested title/description (Groq, Gemini or OpenAI; reviewed and edited by the owner
-  before saving), category, condition, daily price in £, availability window. Publish/unpublish.
+  before saving), category, condition, daily price in £, availability window. Publish/unpublish. With no AI key,
+  or if the AI call fails, the owner writes the title and description themselves.
 - **Browse:** keyword search, category filter, listing pages.
 - **Requests:** renters request dates; owners accept/decline. Acceptance re-checks availability inside a locked
   transaction and creates a booking in `approved_awaiting_payment` (no payment yet).

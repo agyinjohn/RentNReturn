@@ -54,6 +54,7 @@ return [
         'groq_model' => getenv('GROQ_MODEL') ?: 'meta-llama/llama-4-scout-17b-16e-instruct',
         'openai_api_key' => getenv('OPENAI_API_KEY') ?: '',
         'openai_model' => getenv('OPENAI_MODEL') ?: 'gpt-4o',
+        'openai_base_url' => getenv('OPENAI_BASE_URL') ?: 'https://api.openai.com/v1',
         'gemini_api_key' => getenv('GEMINI_API_KEY') ?: '',
         'gemini_model' => getenv('GEMINI_MODEL') ?: 'gemini-1.5-flash',
     ],

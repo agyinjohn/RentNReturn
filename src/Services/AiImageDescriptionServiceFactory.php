@@ -6,6 +6,17 @@ namespace App\Services;
 
 class AiImageDescriptionServiceFactory
 {
+    /** Is an API key set for the configured provider? Without one, listings are written manually. */
+    public static function isConfigured(array $aiConfig): bool
+    {
+        return match ($aiConfig['provider'] ?? 'pipeline') {
+            'groq' => !empty($aiConfig['groq_api_key']),
+            'openai' => !empty($aiConfig['openai_api_key']),
+            'gemini' => !empty($aiConfig['gemini_api_key']),
+            default => !empty($aiConfig['groq_api_key']) || !empty($aiConfig['gemini_api_key']) || !empty($aiConfig['openai_api_key']),
+        };
+    }
+
     /**
      * @param array{provider: string, groq_api_key?: string, groq_model?: string, openai_api_key: string, openai_model?: string, gemini_api_key: string, gemini_model?: string} $aiConfig
      */
@@ -21,7 +32,8 @@ class AiImageDescriptionServiceFactory
         if ($provider === 'openai') {
             return new OpenAiImageDescriptionService(
                 $aiConfig['openai_api_key'],
-                $aiConfig['openai_model'] ?? 'gpt-4o'
+                $aiConfig['openai_model'] ?? 'gpt-4o',
+                $aiConfig['openai_base_url'] ?? 'https://api.openai.com/v1'
             );
         }
         if ($provider === 'gemini') {
@@ -47,7 +59,8 @@ class AiImageDescriptionServiceFactory
         if (!empty($aiConfig['openai_api_key'])) {
             $services[] = new OpenAiImageDescriptionService(
                 $aiConfig['openai_api_key'],
-                $aiConfig['openai_model'] ?? 'gpt-4o'
+                $aiConfig['openai_model'] ?? 'gpt-4o',
+                $aiConfig['openai_base_url'] ?? 'https://api.openai.com/v1'
             );
         }
         if (count($services) === 0) {

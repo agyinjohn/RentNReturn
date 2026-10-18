@@ -6,6 +6,7 @@ namespace Tests\Integration;
 
 use Tests\Support\Browser;
 use Tests\Support\IntegrationTestCase;
+use Tests\Support\TestEnvironment;
 
 /** Step 1 gate: unsafe uploads rejected, temporary AI files cleaned up, AI requests rate limited. */
 final class UploadSecurityTest extends IntegrationTestCase
@@ -49,13 +50,19 @@ final class UploadSecurityTest extends IntegrationTestCase
         return glob(dirname(__DIR__, 2) . '/public/uploads/listings/{draft,ai}_*', GLOB_BRACE) ?: [];
     }
 
-    private function verifiedBrowser(): Browser
+    private function verifiedBrowser(?string $url = null): Browser
     {
         $email = $this->uniqueEmail('uploader');
         $this->createUser($email);
-        $b = $this->browser();
+        $b = new Browser($url ?? static::$url);
         $b->login($email, 'correct-horse');
         return $b;
+    }
+
+    /** App server whose AI provider has a key but cannot be reached, so every AI call fails. */
+    private function failingAiUrl(): string
+    {
+        return TestEnvironment::server(['AI_PROVIDER' => 'openai', 'OPENAI_API_KEY' => 'test-key', 'OPENAI_BASE_URL' => TestEnvironment::deadUrl()]);
     }
 
     private function describeError(Browser $b, string $fixture): string
@@ -64,6 +71,16 @@ final class UploadSecurityTest extends IntegrationTestCase
         $this->assertRedirectsTo('/listings/create', $r);
         $b->get('/listings/create');
         preg_match('/class="form-error">([^<]+)</', $b->lastBody, $m);
+        return html_entity_decode($m[1] ?? '');
+    }
+
+    /** Upload a valid photo; it must be accepted. Returns the notice shown on the review step ('' if none). */
+    private function describeNotice(Browser $b): string
+    {
+        $r = $b->post('/listings/create/describe', [], true, ['image' => new \CURLFile(self::$fixtures . '/valid.jpg', 'image/jpeg', 'valid.jpg')]);
+        $this->assertRedirectsTo('/listings/create/review', $r);
+        $b->get('/listings/create/review');
+        preg_match('/class="form-notice"[^>]*>([^<]+)</', $b->lastBody, $m);
         return html_entity_decode($m[1] ?? '');
     }
 
@@ -78,34 +95,40 @@ final class UploadSecurityTest extends IntegrationTestCase
         $this->assertSame([], $this->publicDraftFiles());
     }
 
-    public function testValidImageWithFailedAiLeavesNoFilesBehind(): void
+    public function testValidImageIsKeptOutsideWebRootAndOldDraftIsReplaced(): void
     {
         $b = $this->verifiedBrowser();
         $before = $this->draftFiles();
-        // No AI key is configured in tests, so the AI step fails after the upload is accepted.
-        $this->assertStringContainsString('AI description failed', $this->describeError($b, 'valid.jpg'));
-        $this->assertSame($before, $this->draftFiles());
-        $this->assertSame([], $this->publicDraftFiles());
+        $this->describeNotice($b);
+        $afterFirst = $this->draftFiles();
+        $this->assertCount(count($before) + 1, $afterFirst, 'The accepted photo is kept as a draft');
+        $this->assertSame([], $this->publicDraftFiles(), 'Drafts never live in the public web root');
+
+        // Starting again replaces (deletes) the previous draft photo instead of leaving it behind.
+        $this->describeNotice($b);
+        $this->assertCount(count($before) + 1, $this->draftFiles());
+        $this->assertNotSame($afterFirst, $this->draftFiles());
     }
 
     public function testAiDescribeIsRateLimitedPerUser(): void
     {
-        $b = $this->verifiedBrowser();
-        // Tests run with RATE_AI_PER_HOUR=2.
-        $this->assertStringContainsString('AI description failed', $this->describeError($b, 'valid.jpg'));
-        $this->assertStringContainsString('AI description failed', $this->describeError($b, 'valid.jpg'));
-        $this->assertStringContainsString('generated a lot of AI descriptions', $this->describeError($b, 'valid.jpg'));
+        $url = $this->failingAiUrl();
+        $b = $this->verifiedBrowser($url);
+        // Tests run with RATE_AI_PER_HOUR=2. Each failed AI call still lets the owner continue manually.
+        $this->assertStringContainsString('could not generate a description', $this->describeNotice($b));
+        $this->assertStringContainsString('could not generate a description', $this->describeNotice($b));
+        $this->assertStringContainsString('used your automatic descriptions', $this->describeNotice($b));
 
         // Rejected uploads do not count against the limit (a different user, all invalid files).
-        $c = $this->verifiedBrowser();
+        $c = $this->verifiedBrowser($url);
         $this->describeError($c, 'shell.jpg');
         $this->describeError($c, 'shell.jpg');
-        $this->assertStringContainsString('AI description failed', $this->describeError($c, 'valid.jpg'));
+        $this->assertStringContainsString('could not generate a description', $this->describeNotice($c));
     }
 
     public function testAiApiRejectsBadFilesCleansUpAndRateLimits(): void
     {
-        $b = $this->verifiedBrowser();
+        $b = $this->verifiedBrowser($this->failingAiUrl());
         $tmpBefore = $this->tmpFiles();
         $bad = $b->post('/api/listing/ai-describe', [], true, ['images[0]' => new \CURLFile(self::$fixtures . '/shell.jpg', 'image/jpeg')]);
         $this->assertSame(400, $bad->status);
@@ -116,6 +139,13 @@ final class UploadSecurityTest extends IntegrationTestCase
         }
         $this->assertSame([502, 502, 429], $statuses);
         $this->assertSame($tmpBefore, $this->tmpFiles(), 'Temporary AI files must always be deleted');
+    }
+
+    public function testAiApiWithoutKeyReportsUnavailable(): void
+    {
+        $r = $this->verifiedBrowser()->post('/api/listing/ai-describe', [], true, ['images[0]' => new \CURLFile(self::$fixtures . '/valid.jpg', 'image/jpeg')]);
+        $this->assertSame(503, $r->status);
+        $this->assertSame(0, (int) $this->db()->query('SELECT COUNT(*) FROM rate_limits')->fetchColumn(), 'No AI call, so nothing counted');
     }
 
     public function testDraftImagesAreNotPubliclyAddressable(): void

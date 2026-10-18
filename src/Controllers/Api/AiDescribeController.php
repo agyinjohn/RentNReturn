@@ -26,6 +26,11 @@ class AiDescribeController extends Controller
             echo json_encode(['error' => 'Unauthorized']);
             return;
         }
+        if (!AiImageDescriptionServiceFactory::isConfigured($this->config['ai'])) {
+            http_response_code(503);
+            echo json_encode(['error' => 'Automatic descriptions are not available. Please write the description yourself.']);
+            return;
+        }
         // Temporary files go outside public/ and are always deleted below.
         $uploadDir = $this->config['upload']['tmp_path'];
         if (!is_dir($uploadDir)) {

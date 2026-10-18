@@ -118,8 +118,10 @@ final class TestEnvironment
         fclose($sock);
 
         $root = dirname(__DIR__, 2);
+        $script = $root . '/tests/' . ($envOverrides['__script'] ?? 'router') . '.php';
+        unset($env['__script']);
         $proc = proc_open(
-            [PHP_BINARY, '-d', 'upload_max_filesize=6M', '-d', 'post_max_size=32M', '-S', "127.0.0.1:{$port}", '-t', $root . '/public', $root . '/tests/router.php'],
+            [PHP_BINARY, '-d', 'upload_max_filesize=6M', '-d', 'post_max_size=32M', '-S', "127.0.0.1:{$port}", '-t', $root . '/public', $script],
             [0 => ['file', '/dev/null', 'r'], 1 => ['file', self::tmpDir() . "/server-{$port}.log", 'a'], 2 => ['file', self::tmpDir() . "/server-{$port}.log", 'a']],
             $pipes,
             $root,
@@ -139,6 +141,21 @@ final class TestEnvironment
             register_shutdown_function([self::class, 'stopServers']);
         }
         return $url;
+    }
+
+    /** A fake OpenAI-compatible API (tests/fake_openai.php). Returns its base URL for OPENAI_BASE_URL. */
+    public static function fakeAiServer(): string
+    {
+        return self::server(['__script' => 'fake_openai']) . '/v1';
+    }
+
+    /** A base URL nothing listens on, for "AI configured but unreachable". */
+    public static function deadUrl(): string
+    {
+        $sock = stream_socket_server('tcp://127.0.0.1:0');
+        $name = (string) stream_socket_get_name($sock, false);
+        fclose($sock);
+        return 'http://' . $name . '/v1';
     }
 
     public static function stopServers(): void

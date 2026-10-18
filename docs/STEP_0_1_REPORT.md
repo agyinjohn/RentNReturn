@@ -30,7 +30,7 @@ Built on the Fixed Foundation (5 Oct 2026). Branch: `claude/client-requirements-
 | Real email delivery | ✅ **new** | SMTP via PHPMailer (works with Postmark, SES, Brevo, Mailgun, Microsoft 365...). In development, emails are written to `storage/logs/mail.log`. |
 | Secure image uploads | ✅ | Image actually decoded; JPEG/PNG/WebP only; 5 MB max; 100 px minimum and 10,000 px / 50 MP maximum dimensions, which stops "decompression bomb" images. Random filenames. Scripts can't run from `uploads/`. Uploads over PHP's own size limit now get a clear message instead of "Please upload one photo". |
 | AI temp files out of public storage + always deleted | ✅ | Draft photos now live in `storage/uploads/drafts` (outside the web root) and are served only to their owner. AI temp files go to `storage/tmp` and are always deleted. `bin/cleanup.php` removes abandoned drafts after 24 hours. |
-| Rate-limit AI requests (API cost) | ✅ **new** | 10 per user per hour and 30 per day (configurable). Rejected uploads don't count. |
+| Rate-limit AI requests (API cost) | ✅ **new** | 10 per user per hour and 30 per day (configurable). Rejected uploads don't count. Over the limit, the owner writes the description themselves instead of being blocked. |
 | Fix "Request accepted" after a failed DB action | ✅ (foundation) + tested | |
 | Security headers + production error handling | ✅ | Content-Security-Policy (scripts only from our own site), X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy, HSTS outside development. |
 | Mobile number + OTP | ➡️ moved to Step 3 | The spec lists it in Stage 1, but the checklist puts it in Step 3 ("verified mobile number with OTP/code"). It needs an SMS provider account (e.g. Twilio, Vonage), so it is grouped with the Step 3 verification work. |
@@ -47,7 +47,7 @@ Apply with `php bin/migrate.php` after `php bin/backup.php`, **on staging first*
 
 ## Test results
 
-`composer test`: **48 tests, 356 assertions, all passing** on PHP 8.3 + MariaDB 10.11. CI (`.github/workflows/tests.yml`) also runs them on PHP 8.1 + MySQL 8.0 on every push.
+`composer test`: **52 tests, 430 assertions, all passing** on PHP 8.3 + MariaDB 10.11 locally. CI (`.github/workflows/tests.yml`) runs them on every push on PHP 8.1 + MySQL 8.0 and PHP 8.3 + MariaDB 10.11; both passed for the Step 0/1 commit.
 The integration tests run the real app on a web server and use it over HTTP, the way a browser would.
 
 | Pass gate requirement | Tests |
@@ -70,7 +70,7 @@ As a check that the tests are meaningful, I removed the CSRF check, the session 
 1. **Credential rotation** (above) is a manual task.
 2. **Choose an SMTP provider** and set up SPF/DKIM for the sending domain. Staging won't start without SMTP settings.
 3. **Existing users and verification:** require them to verify (current behaviour) or mark them verified?
-4. **Pre-existing bug, not fixed here:** with no AI key configured, or if the AI call fails, users cannot create a listing at all. The README promised a manual fallback, but the code returns to the upload page with an error. It's a small change (go to the review step with empty fields) if you want it in the next round.
+4. ~~Pre-existing bug: no AI key = no listings.~~ **Fixed.** Previously, with no AI key configured, or when the AI call failed, users could not create a listing at all. Now the photo is kept and the owner writes the title and description themselves. The same happens when they hit the AI limit, with a short explanation. Covered end to end by `ListingCreationTest` (no key, working AI and failing AI each produce a saved listing with its photo).
 5. The migration was tested against a **simulated** copy of the original MVP database. It must still be run against a backup of the real staging database.
 6. Mobile OTP and identity verification → Step 3.
 
