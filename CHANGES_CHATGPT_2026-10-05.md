@@ -37,3 +37,11 @@ This is a separate working copy of Nasira’s MVP. The original ZIP was not over
 4. Regression-test signup/login/profile/listing creation/publish/request/accept/decline.
 5. Specifically test overlapping requests using two renter accounts.
 6. Do not add live Stripe keys yet.
+
+## Migration fixes — 18 Oct 2026
+- `storage/migrations/2026_10_05_phase2_foundation.sql` is now safe to re-run and no longer fails on a fresh install (where `schema.sql` already creates `uq_listings_slug`). Each step checks `information_schema` first; works on MySQL 5.7+ and MariaDB.
+- Duplicate listing slugs are de-duplicated (oldest keeps its slug, others get `-<id>`) before the unique key is added. URLs for renamed duplicates change.
+- `bookings.status` is widened to `VARCHAR(32)` before setting `approved_awaiting_payment`, so the update cannot fail if the MVP column was an ENUM.
+- `storage/schema.sql` now includes `users.email_verified_at`, `users.phone`, `users.phone_verified_at` and `idx_bookings_listing_dates_status`, so a fresh install matches a migrated database.
+- Added a `schema_migrations` table recording applied migration versions.
+- Install: fresh database → import `storage/schema.sql` only. Existing database → back up, then run the migration.

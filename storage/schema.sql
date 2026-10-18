@@ -8,8 +8,11 @@ USE p2p_rent;
 CREATE TABLE users (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,
+    email_verified_at TIMESTAMP NULL,
     password_hash VARCHAR(255) NOT NULL,
     name VARCHAR(255) NOT NULL,
+    phone VARCHAR(32) NULL,
+    phone_verified_at TIMESTAMP NULL,
     contact_preference ENUM('email', 'phone', 'both') NOT NULL DEFAULT 'email',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -87,5 +90,14 @@ CREATE TABLE bookings (
     FOREIGN KEY (renter_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_bookings_owner (owner_id),
-    INDEX idx_bookings_renter (renter_id)
+    INDEX idx_bookings_renter (renter_id),
+    INDEX idx_bookings_listing_dates_status (listing_id, start_date, end_date, status)
 ) ENGINE=InnoDB;
+
+-- Applied migrations. A fresh install from this file already includes the ones below.
+CREATE TABLE schema_migrations (
+    version VARCHAR(64) NOT NULL PRIMARY KEY,
+    applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+INSERT INTO schema_migrations (version) VALUES ('2026_10_05_phase2_foundation');
